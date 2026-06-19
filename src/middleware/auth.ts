@@ -26,12 +26,17 @@ export const requireAuth = async (
 
     // Get or create database user
     const email = decodedToken.email || '';
+    const emailLower = email.toLowerCase();
     let dbUserList = await db.select().from(users).where(eq(users.uid, decodedToken.uid));
 
     if (dbUserList.length === 0) {
       // First registered user or specific email is Super Admin
       let role = 'CUSTOMER';
-      if (email === 'goodtinsae@gmail.com' || email.toLowerCase().startsWith('admin')) {
+      if (
+        emailLower === 'goodtinsae@gmail.com' ||
+        emailLower === 'itistinsae@gmail.com' ||
+        emailLower.startsWith('admin')
+      ) {
         role = 'SUPER_ADMIN';
       } else {
         // If there are zero users in the database, make them Super Admin
@@ -56,7 +61,19 @@ export const requireAuth = async (
         .returning();
       req.dbUser = newUser[0];
     } else {
-      req.dbUser = dbUserList[0];
+      let dbUser = dbUserList[0];
+      // Auto-escalation if they are logging in with admin e-mails but don't have SUPER_ADMIN role yet
+      if (
+        (emailLower === 'goodtinsae@gmail.com' || emailLower === 'itistinsae@gmail.com') &&
+        dbUser.role !== 'SUPER_ADMIN'
+      ) {
+        const updatedUser = await db.update(users)
+          .set({ role: 'SUPER_ADMIN' })
+          .where(eq(users.id, dbUser.id))
+          .returning();
+        dbUser = updatedUser[0];
+      }
+      req.dbUser = dbUser;
     }
 
     next();
