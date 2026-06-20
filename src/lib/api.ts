@@ -2,10 +2,18 @@ import { auth } from './firebase.ts';
 
 // Get current user ID token
 export async function getAuthHeader() {
+  const localToken = localStorage.getItem('local_auth_token');
+  if (localToken) {
+    return { 'Authorization': `Bearer ${localToken}` };
+  }
   const user = auth.currentUser;
   if (!user) return {};
-  const token = await user.getIdToken();
-  return { 'Authorization': `Bearer ${token}` };
+  try {
+    const token = await user.getIdToken();
+    return { 'Authorization': `Bearer ${token}` };
+  } catch (err) {
+    return {};
+  }
 }
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
@@ -113,5 +121,19 @@ export const apiClient = {
   // Analytics
   async getAnalytics() {
     return apiFetch('/api/analytics');
+  },
+
+  // Auth Operations
+  async login(data: { email: string; password?: string }) {
+    return apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async register(data: { email: string; password?: string; name?: string; phone?: string; whatsapp?: string; address?: string; city?: string }) {
+    return apiFetch('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 };

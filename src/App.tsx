@@ -17,7 +17,7 @@ import Footer from './components/Footer';
 import { Product, CartItem } from './types';
 import { EXCHANGE_RATE_ETB } from './data/products';
 import { auth, googleAuthProvider as googleProvider } from './lib/firebase.ts';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithPopup, signInWithCustomToken, signOut } from 'firebase/auth';
 import { apiClient } from './lib/api.ts';
 import AdminDashboard from './components/AdminDashboard.tsx';
 
@@ -42,7 +42,14 @@ import {
 
 export default function App() {
   // Authentication & Panel toggles
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('local_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [productsList, setProductsList] = useState<Product[]>([]);
@@ -104,7 +111,9 @@ export default function App() {
   // Signout support logic
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await signOut(auth).catch(() => {});
+      localStorage.removeItem('local_auth_token');
+      localStorage.removeItem('local_auth_user');
       setUser(null);
     } catch (err) {
       console.error(err);
@@ -133,9 +142,33 @@ export default function App() {
     setAuthError('');
     try {
       if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const regRes = await apiClient.register({ email, password });
+        if (regRes.localToken) {
+          localStorage.setItem('local_auth_token', regRes.localToken);
+        }
+        if (regRes.user) {
+          localStorage.setItem('local_auth_user', JSON.stringify(regRes.user));
+          setUser(regRes.user);
+        }
+        try {
+          await signInWithCustomToken(auth, regRes.customToken);
+        } catch (authErr) {
+          console.warn('Firebase Custom Token sign-in failed during registry, continuing with local session:', authErr);
+        }
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const loginRes = await apiClient.login({ email, password });
+        if (loginRes.localToken) {
+          localStorage.setItem('local_auth_token', loginRes.localToken);
+        }
+        if (loginRes.user) {
+          localStorage.setItem('local_auth_user', JSON.stringify(loginRes.user));
+          setUser(loginRes.user);
+        }
+        try {
+          await signInWithCustomToken(auth, loginRes.customToken);
+        } catch (authErr) {
+          console.warn('Firebase Custom Token sign-in failed, continuing with local session:', authErr);
+        }
       }
       setShowAuthModal(false);
       setEmail('');
@@ -156,11 +189,18 @@ export default function App() {
     const passwordBypass = 'Dub2AddisSecurePass1!';
     
     try {
+      const loginRes = await apiClient.login({ email: customEmail, password: passwordBypass });
+      if (loginRes.localToken) {
+        localStorage.setItem('local_auth_token', loginRes.localToken);
+      }
+      if (loginRes.user) {
+        localStorage.setItem('local_auth_user', JSON.stringify(loginRes.user));
+        setUser(loginRes.user);
+      }
       try {
-        await signInWithEmailAndPassword(auth, customEmail, passwordBypass);
-      } catch (signInErr) {
-        // Create model
-        await createUserWithEmailAndPassword(auth, customEmail, passwordBypass);
+        await signInWithCustomToken(auth, loginRes.customToken);
+      } catch (authErr) {
+        console.warn('Firebase Custom Token sign-in failed during bypass, continuing with local session:', authErr);
       }
       
       // Let's force synchronize profile role
@@ -169,6 +209,7 @@ export default function App() {
           await apiClient.updateProfile({ role: roleType, name: `${roleType.charAt(0) + roleType.slice(1).toLowerCase()} Simulator` });
           const profile = await apiClient.getProfile();
           setUser(profile);
+          localStorage.setItem('local_auth_user', JSON.stringify(profile));
         } catch (e) {}
       }, 500);
 
@@ -185,26 +226,39 @@ export default function App() {
   useEffect(() => {
     loadMasterCatalog();
 
+    const syncProfile = async () => {
+      try {
+        const profile = await apiClient.getProfile();
+        setUser(profile);
+        localStorage.setItem('local_auth_user', JSON.stringify(profile));
+        if (profile.wishlist && Array.isArray(profile.wishlist)) {
+          const resolvedWishList = productsList.filter(p => profile.wishlist.includes(p.id.toString()));
+          if (resolvedWishList.length > 0) {
+            setWishlist(resolvedWishList);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to sync profile from DB:', error);
+      }
+    };
+
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        try {
-          // Fetch synced database profile (creates user if first-time)
-          const profile = await apiClient.getProfile();
-          setUser(profile);
-          if (profile.wishlist && Array.isArray(profile.wishlist)) {
-            // Load wishlist from db
-            const resolvedWishList = productsList.filter(p => profile.wishlist.includes(p.id.toString()));
-            if (resolvedWishList.length > 0) {
-              setWishlist(resolvedWishList);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to sync auth with Cloud SQL profile:', error);
-        }
+        await syncProfile();
       } else {
-        setUser(null);
+        const hasLocalToken = localStorage.getItem('local_auth_token');
+        if (hasLocalToken) {
+          await syncProfile();
+        } else {
+          setUser(null);
+          localStorage.removeItem('local_auth_user');
+        }
       }
     });
+
+    if (localStorage.getItem('local_auth_token')) {
+      syncProfile();
+    }
 
     return () => unsubscribe();
   }, [productsList.length]);
@@ -732,6 +786,13 @@ export default function App() {
                   />
                   <Key className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
                 </div>
+              </div>
+
+              {/* Secure Administrative Credentials Info Block */}
+              <div className="p-2.5 bg-neutral-50 border border-neutral-200 text-neutral-600 text-[9px] uppercase tracking-wider font-extrabold space-y-1 rounded-none leading-relaxed">
+                <span className="text-[#D4AF37] block">✦ ADMIN PROFILE ACCESS KEYS:</span>
+                <div>Emails: <code className="text-black bg-neutral-100 px-1 rounded font-mono font-bold">goodtinsae@gmail.com</code> / <code className="text-black bg-neutral-100 px-1 rounded font-mono font-bold">itistinsae@gmail.com</code></div>
+                <div>Password: <code className="text-black bg-neutral-100 px-1 rounded font-mono font-bold">atinzzz</code></div>
               </div>
 
               <button

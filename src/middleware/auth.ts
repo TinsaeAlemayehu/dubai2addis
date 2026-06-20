@@ -9,6 +9,27 @@ export interface AuthRequest extends Request {
   dbUser?: any;
 }
 
+import crypto from 'crypto';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_local_secret_dub2addis_2026_!!';
+
+export function verifyLocalToken(token: string): { uid: string; email: string; name: string } | null {
+  if (!token.startsWith('local:')) return null;
+  try {
+    const parts = token.slice(6).split('.');
+    if (parts.length !== 2) return null;
+    const [payloadBase64, signature] = parts;
+    const str = Buffer.from(payloadBase64, 'base64').toString('utf8');
+    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(str).digest('hex');
+    if (signature !== expectedSignature) return null;
+    const payload = JSON.parse(str);
+    if (payload.exp < Date.now()) return null;
+    return payload;
+  } catch (err) {
+    return null;
+  }
+}
+
 export const requireAuth = async (
   req: AuthRequest,
   res: Response,
@@ -21,7 +42,22 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
+    let decodedToken: any = null;
+
+    if (token.startsWith('local:')) {
+      const payload = verifyLocalToken(token);
+      if (!payload) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid local custom token' });
+      }
+      decodedToken = {
+        uid: payload.uid,
+        email: payload.email,
+        name: payload.name
+      };
+    } else {
+      decodedToken = await adminAuth.verifyIdToken(token);
+    }
+
     req.user = decodedToken;
 
     // Get or create database user
@@ -51,7 +87,7 @@ export const requireAuth = async (
           uid: decodedToken.uid,
           email: email,
           role: role,
-          name: decodedToken.name || 'Anonymous Customer',
+          name: decodedToken.name || emailLower.split('@')[0] || 'Anonymous Customer',
           phone: '',
           whatsapp: '',
           address: '',
@@ -68,7 +104,7 @@ export const requireAuth = async (
         dbUser.role !== 'SUPER_ADMIN'
       ) {
         const updatedUser = await db.update(users)
-          .set({ role: 'SUPER_ADMIN' })
+           .set({ role: 'SUPER_ADMIN' })
           .where(eq(users.id, dbUser.id))
           .returning();
         dbUser = updatedUser[0];
@@ -78,7 +114,7 @@ export const requireAuth = async (
 
     next();
   } catch (error) {
-    console.error('Error verifying Firebase ID token:', error);
+    console.error('Error verifying ID token:', error);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };
