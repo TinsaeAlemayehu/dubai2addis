@@ -6,7 +6,7 @@
 import React from 'react';
 import { Product } from '../types';
 import { EXCHANGE_RATE_ETB } from '../data/products';
-import { Heart, Eye, MessageCircle, Star } from 'lucide-react';
+import { Heart, Eye, MessageCircle, ShoppingBag } from 'lucide-react';
 
 interface ProductCardProps {
   key?: React.Key;
@@ -15,6 +15,7 @@ interface ProductCardProps {
   onToggleWishlist: () => void;
   onQuickView: () => void;
   onOrderWhatsApp: () => void;
+  onAddToCart: () => void;
 }
 
 export default function ProductCard({
@@ -22,7 +23,8 @@ export default function ProductCard({
   isWishlisted,
   onToggleWishlist,
   onQuickView,
-  onOrderWhatsApp
+  onOrderWhatsApp,
+  onAddToCart
 }: ProductCardProps) {
   // Support both Master DB schemas and legacy mock structures seamlessly
   const convertedPriceETB = (product as any).priceETB !== undefined 
@@ -111,68 +113,83 @@ export default function ProductCard({
       </div>
 
       {/* 2. Interactive Product Details */}
-      <div className="p-4 flex-1 flex flex-col justify-between rounded-none bg-white">
-        <div className="space-y-1.5">
-          {/* Brand and category labels */}
-          <div className="flex items-center justify-between font-sans text-[10px] tracking-wider uppercase font-bold text-gray-400">
-            <span className="text-[#D4AF37] font-black">{product.brand}</span>
-            <span>{product.category}</span>
+      <div className="p-3.5 flex-1 flex flex-col justify-between rounded-none bg-white">
+        <div className="space-y-1">
+          {/* Brand label */}
+          <div className="flex items-center justify-between font-sans text-[9px] text-neutral-400 font-medium uppercase tracking-wider">
+            <span className="text-[#a17a4c] font-bold">{product.brand}</span>
           </div>
 
           {/* Title Header */}
           <h3 
             onClick={onQuickView}
-            className="font-sans text-[11px] font-bold text-black uppercase tracking-wide line-clamp-2 leading-snug cursor-pointer hover:text-[#D4AF37] transition-colors"
+            className="font-sans text-[11px] font-semibold text-neutral-800 tracking-tight truncate cursor-pointer hover:text-[#D4AF37] transition-colors leading-tight"
+            title={product.name}
           >
             {product.name}
           </h3>
 
-          {/* Rating visual score stars */}
-          <div className="flex items-center gap-1 pb-1">
-            <div className="flex items-center text-[#D4AF37]">
-              {[...Array(5)].map((_, i) => (
-                <Star 
-                  key={i} 
-                  className={`h-2.5 w-2.5 ${i < Math.floor(ratingScore) ? 'fill-[#D4AF37] text-[#D4AF37]' : 'text-neutral-200'}`} 
-                />
-              ))}
-            </div>
-            <span className="font-sans text-[9px] text-neutral-400">({reviewsCountVal})</span>
-          </div>
+          {/* Sourcing Short Description (One line max, filtered of categories) */}
+          <p className="font-sans text-[10px] text-neutral-400 font-normal truncate leading-tight">
+            {product.description
+              ? product.description
+                  .replace(/\b(dresses|dress|shoes|shoe|handbags|handbag|bags|bag|watches|watch|perfumes|perfume|kaftans|kaftan|gowns|gown|abayas|abaya|heels|slides|activewear|accessories|jewelries|jewelry|sneakers|sneaker)\b/gi, '')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+              : ''}
+          </p>
         </div>
 
-        <div className="space-y-3 pt-2">
-          {/* Price blocks */}
-          <div className="border-t border-gray-100 pt-2.5 flex flex-wrap items-baseline justify-between gap-2">
-            {/* Discount Price */}
-            <div className="flex flex-col">
-              <span className="font-sans text-black text-sm font-black tracking-tight">
-                {convertedPriceETB.toLocaleString()} ETB
-              </span>
-            </div>
-
-            {/* Original crossout price */}
+        <div className="space-y-2 pt-2 border-t border-gray-100 mt-2">
+          {/* Price blocks listed on one line */}
+          <div className="flex items-baseline gap-1.5 flex-nowrap overflow-hidden select-none">
+            <span className="font-sans text-black text-xs sm:text-[13px] font-black tracking-tight shrink-0">
+              {convertedPriceETB.toLocaleString()} ETB
+            </span>
             {originalPriceETB ? (
-              <div className="text-neutral-400 line-through font-sans text-[10px] text-right">
-                <span>{originalPriceETB.toLocaleString()} ETB</span>
-              </div>
+              <>
+                <span className="text-neutral-400 line-through font-sans text-[10px] shrink-0">
+                  {originalPriceETB.toLocaleString()} ETB
+                </span>
+                {discountPercent > 0 && (
+                  <span className="text-[#e25822] font-black text-[9px] shrink-0 hidden min-[340px]:inline-block bg-[#fff5f5] px-1 rounded">
+                    -{discountPercent}%
+                  </span>
+                )}
+              </>
             ) : (
-              <span className="text-[9px] text-green-600 font-bold uppercase tracking-wider">In Stock</span>
+              <span className="text-[9px] text-green-600 font-bold uppercase tracking-wider shrink-0">In Stock</span>
             )}
           </div>
 
-          {/* Primary Action Button (Order Directly on WhatsApp) */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOrderWhatsApp();
-            }}
-            className="w-full bg-black hover:bg-[#D4AF37] text-white hover:text-black font-sans font-bold text-[10px] tracking-widest py-2.5 px-3 rounded-none uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-black hover:border-[#D4AF37] duration-150"
-            id={`whatsapp-order-${product.id}`}
-          >
-            <MessageCircle className="h-3.5 w-3.5 fill-current/10" />
-            <span>WhatsApp Order</span>
-          </button>
+          {/* Cool Side-by-side Action Buttons */}
+          <div className="flex items-stretch gap-1.5 mt-1.5">
+            {/* Quick Add Sourcing Bag icon only */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCart();
+              }}
+              className="bg-neutral-50 hover:bg-neutral-100 text-neutral-800 hover:text-black border border-neutral-200 hover:border-neutral-300 p-2 rounded-md flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95"
+              title="Quick Add to Bag"
+              id={`add-to-cart-${product.id}`}
+            >
+              <ShoppingBag className="h-4 w-4" />
+            </button>
+
+            {/* Elegant WhatsApp Direct Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOrderWhatsApp();
+              }}
+              className="flex-1 bg-[#25D366] hover:bg-[#20ba5a] text-white font-sans font-semibold text-[10px] sm:text-[11px] py-2 px-2.5 rounded-md flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95"
+              id={`whatsapp-order-${product.id}`}
+            >
+              <MessageCircle className="h-3.5 w-3.5 fill-current/10" />
+              <span>WhatsApp</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

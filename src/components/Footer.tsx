@@ -28,7 +28,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
     <footer className="bg-neutral-950 text-neutral-400 font-sans text-xs select-none border-t border-neutral-900" id="footer">
       
       {/* 1. Main Footer Grid */}
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10 border-b border-neutral-900">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-12 md:py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10 border-b border-neutral-900">
         
         {/* Branding & description block */}
         <div className="space-y-4">
@@ -163,7 +163,11 @@ export default function Footer({ onSelectCategory }: FooterProps) {
             </li>
             <li className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-emerald-500" />
-              <span>+971 55 273 4073</span>
+              <span>WhatsApp Chat: <a href="https://wa.me/971552734073" target="_blank" referrerPolicy="no-referrer" className="hover:text-white transition-colors">+971 55 273 4073</a></span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-gold-500" />
+              <span>Call Support: <a href="tel:+251909319951" className="hover:text-white transition-colors">+251 909 319 951</a></span>
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-gold-500" />
@@ -176,7 +180,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
 
       {/* 2. Sourcing warning and legal declarations wrapper */}
       <div className="bg-neutral-950/65 text-[10px] py-6 px-4 border-b border-neutral-900 select-none">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-neutral-600 font-sans text-center md:text-left">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-neutral-600 font-sans text-center md:text-left">
           <div className="flex flex-col gap-1">
             <span className="text-neutral-400 font-bold block flex items-center justify-center md:justify-start gap-1">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
@@ -195,7 +199,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
 
       {/* 3. Credits & copyright */}
       <div className="bg-neutral-950 py-4 text-center text-neutral-600 text-[10px] select-none">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col sm:flex-row justify-between items-center gap-2">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 flex flex-col sm:flex-row justify-between items-center gap-2">
           <p>© {currentYear} Dubai2Addis Fashion Brand Sourcing Platform. Sourced and delivered with confidence.</p>
           <div className="flex items-center gap-4">
             <a href="#footer" className="hover:text-neutral-400">Privacy Policy</a>

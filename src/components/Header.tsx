@@ -54,6 +54,7 @@ export default function Header({
   const announcements = [
     '✨ FREE COURIER FROM DUBAI TO ETHIOPIA ON ORDERS ABOVE 36,500 ETB! ✨',
     '📞 24/7 WHATSAPP SUPPORT: +971 55 273 4073 📞',
+    '📞 CALL SUPPORT (ETHIOPIA): +251 909 319 951 📞',
     '🔥 NEW ARRIVALS DIRECT FROM DUBAI EXCLUSIVE MALLS 🔥'
   ];
 
@@ -103,28 +104,32 @@ export default function Header({
   return (
     <>
       {/* 1. Announcement Bar */}
-      <div className="bg-[#111111] text-white text-[10px] md:text-xs tracking-widest text-center py-2.5 px-4 font-sans font-medium transition-all duration-500 select-none border-b border-gold-500/20">
-        <div className="flex items-center justify-center gap-2 max-w-7xl mx-auto h-4">
+      <div className="bg-[#111111] text-white text-[10px] md:text-xs lg:text-[14px] tracking-widest text-center py-2.5 px-4 font-sans font-medium transition-all duration-500 select-none border-b border-gold-500/20">
+        <div className="flex items-center justify-center gap-2 max-w-[1400px] mx-auto min-h-4">
           <Sparkles className="h-3.5 w-3.5 text-gold-500 animate-pulse shrink-0" />
-          <span className="truncate">{announcements[activeAnnouncement]}</span>
+          <span className="truncate whitespace-normal md:truncate">{announcements[activeAnnouncement]}</span>
         </div>
       </div>
 
       {/* 2. Top Bar (Desktop metadata features) */}
       <div className="hidden lg:block bg-neutral-50 py-1.5 border-b border-neutral-100 text-xs text-neutral-600 font-sans">
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <div className="flex items-center gap-6">
-            <span className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="font-semibold text-neutral-800">Dubai Sourced:</span> Guarantees 100% original designer finds
+        <div className="max-w-[1400px] mx-auto px-6 flex justify-between items-center gap-4">
+          {/* Column 1 */}
+          <div className="flex items-center gap-1.5 justify-start flex-1">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="h-3 w-[1px] bg-neutral-200" />
-            <span className="text-gold-700 font-medium">✨ Fast shipping to Addis Ababa, Hawassa, & Adama</span>
+            <span><span className="font-semibold text-neutral-800">Dubai Sourced:</span> Guarantees 100% original designer finds</span>
           </div>
-          <div className="flex items-center gap-5">
+          
+          {/* Column 2 */}
+          <div className="flex items-center justify-center text-gold-700 font-medium flex-1 text-center">
+            <span>✨ Fast shipping to Addis Ababa, Hawassa, & Adama</span>
+          </div>
+
+          {/* Column 3 */}
+          <div className="flex items-center justify-end gap-4 flex-1">
             <a 
               href="https://wa.me/971552734073" 
               target="_blank" 
@@ -135,73 +140,52 @@ export default function Header({
               <span>WhatsApp: +971 55 273 4073</span>
             </a>
             <span className="h-3 w-[1px] bg-neutral-200" />
-            <a href="#how-it-works" className="hover:text-gold-600 transition-colors">How Sourcing Works</a>
+            <a 
+              href="tel:+251909319951"
+              className="flex items-center gap-1.5 hover:text-gold-600 transition-colors"
+            >
+              <Phone className="h-3.5 w-3.5 text-gold-500" />
+              <span>Call: +251 909 319 951</span>
+            </a>
+            <span className="h-3 w-[1px] bg-neutral-200" />
+            <a href="#how-it-works" className="hover:text-gold-600 transition-colors text-right">How Sourcing Works</a>
           </div>
         </div>
       </div>
 
       {/* 3. Main Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md shadow-sm border-b border-neutral-100 transition-all">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3.5 md:py-4 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md shadow-sm border-b border-neutral-100 transition-all overflow-visible">
+        <div className="max-w-[1400px] mx-auto px-6 py-3.5 md:py-4 flex items-center justify-between gap-2.5 md:gap-4 w-full overflow-visible box-border">
           
           {/* Mobile Menu & Logo Container */}
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-1.5 text-neutral-800 hover:bg-neutral-100 rounded-full transition-colors"
-              aria-label="Open navigation menu"
-              id="mobile-menu-trigger"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
+          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             
             {/* Branding Logo */}
             <div 
               onClick={() => onSelectCategory('all')} 
-              className="cursor-pointer select-none"
+              className="cursor-pointer select-none shrink-0"
             >
               <div className="flex flex-col">
-                <span className="font-sans text-xl md:text-2xl font-black tracking-tighter leading-none text-black">
+                <span className="font-sans text-lg md:text-2xl font-black tracking-tighter leading-none text-black">
                   DUBAI2ADDIS
                 </span>
-                <span className="text-[9px] tracking-[0.3em] text-gold-500 uppercase font-black mt-0.5 block">
+                <span className="text-[8px] md:text-[9px] tracking-[0.3em] text-gold-500 uppercase font-black mt-0.5 block">
                   FASHION HOUSE
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Desktop Central Category Tabs */}
-          <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
-            {mainCategories.map((cat) => {
-              const isActive = (cat.id === 'all' && activeCategory === '') || activeCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => onSelectCategory(cat.id === 'all' ? '' : cat.id)}
-                  className={`px-3.5 py-2 text-[11px] font-sans uppercase tracking-widest transition-all duration-200 font-bold ${
-                    isActive 
-                      ? 'text-black border-b-2 border-black rounded-none' 
-                      : 'text-gray-400 hover:text-black hover:bg-neutral-50 rounded-none'
-                  }`}
-                  id={`cat-tab-${cat.id}`}
-                >
-                  {cat.name.replace('Products', '').replace('Abayas & Hijabs', 'Abayas').replace('Beauty & Oud', 'Beauty')}
-                </button>
-              );
-            })}
-          </nav>
-
           {/* Search Box & Controls */}
-          <div className="flex items-center gap-3 md:gap-4 shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 shrink-0 flex-shrink-0 overflow-visible">
             {/* Live Search Form */}
-            <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative max-w-sm">
+            <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative max-w-sm shrink-0">
               <input
                 type="text"
                 placeholder="Search bags, abayas, dresses..."
                 value={searchVal}
                 onChange={handleSearchChange}
-                className="w-56 lg:w-64 pl-9 pr-4 py-2 border border-neutral-200 text-sm focus:outline-none focus:border-gold-500 rounded bg-neutral-50/50 hover:bg-neutral-50 transition-colors font-sans"
+                className="w-40 md:max-lg:w-44 lg:w-56 xl:w-64 pl-9 pr-4 py-2 border border-neutral-200 text-sm focus:outline-none focus:border-gold-500 rounded bg-neutral-50/50 hover:bg-neutral-50 transition-colors font-sans"
               />
               <Search className="absolute left-3 h-4 w-4 text-neutral-400 pointer-events-none" />
               {searchVal && (
@@ -221,7 +205,7 @@ export default function Header({
                 const mobileSearchInput = document.getElementById('mobile-search');
                 if (mobileSearchInput) mobileSearchInput.focus();
               }}
-              className="md:hidden p-2 text-neutral-700 hover:bg-neutral-100 rounded-full"
+              className="md:hidden p-2 text-neutral-700 hover:bg-neutral-100 rounded-full shrink-0"
             >
               <Search className="h-5 w-5" />
             </button>
@@ -229,7 +213,7 @@ export default function Header({
             {/* Wishlist Button */}
             <button
               onClick={onOpenWishlist}
-              className="relative p-2 text-neutral-700 hover:text-gold-600 hover:bg-gold-500/5 rounded-full transition-all"
+              className="relative p-2 text-neutral-700 hover:text-gold-600 hover:bg-gold-500/5 rounded-full transition-all shrink-0"
               id="wishlist-header-btn"
               title="View Wishlist"
             >
@@ -241,37 +225,25 @@ export default function Header({
               )}
             </button>
 
-            {/* Shopping Bag Button */}
-            <button
-              onClick={onOpenCart}
-              className="relative p-2.5 bg-black text-[#ffffff] hover:bg-[#D4AF37] hover:border-[#D4AF37] hover:text-black font-sans tracking-wide text-xs font-semibold rounded-none flex items-center gap-1.5 transition-all shadow-sm active:scale-95 border border-black"
-              id="cart-header-btn"
-            >
-              <ShoppingBag className="h-4.5 w-4.5" />
-              <span className="hidden sm:inline">Sourcing Bag</span>
-              <span className="bg-[#ffffff] text-black text-[9px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center">
-                {cartCount}
-              </span>
-            </button>
-
             {/* Auth / Profile Hub */}
-            <div className="flex items-center gap-2 border-l border-neutral-200 pl-3 md:pl-4">
+            <div className="flex items-center gap-2 border-l border-neutral-200 pl-2.5 md:pl-4 shrink-0 overflow-visible">
               {!user ? (
                 <button
                   onClick={onSignIn}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-neutral-300 text-[10px] md:text-xs font-bold uppercase tracking-widest text-neutral-800 hover:border-black active:scale-95 transition-all"
+                  className="relative p-2 text-neutral-700 hover:text-gold-600 hover:bg-gold-500/5 rounded-full transition-all flex items-center justify-center md:border md:border-neutral-300 md:px-3 md:py-2 md:text-xs md:font-bold md:uppercase md:tracking-widest md:text-neutral-800 md:hover:border-black md:rounded-none shrink-0"
                   id="google-signin-btn"
+                  title="Sign In"
                 >
-                  <User className="h-4 w-4 text-neutral-400" />
+                  <User className="h-5 w-5 md:h-4 md:w-4 md:text-neutral-400" />
                   <span className="hidden md:inline">Sign In</span>
                 </button>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
                   {/* Shopify Admin Workspace (Super admin or Staff only) */}
                   {(user.role === 'SUPER_ADMIN' || user.role === 'STAFF') && (
                     <button
                       onClick={onOpenDashboard}
-                      className="flex items-center gap-1 px-2.5 py-2 bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-gold-800 hover:bg-[#D4AF37]/25 transition-all active:scale-95"
+                      className="flex items-center gap-1 px-2 py-1.5 md:px-2.5 md:py-2 bg-[#D4AF37]/15 border border-[#D4AF37]/30 text-gold-800 hover:bg-[#D4AF37]/25 transition-all active:scale-95 shrink-0"
                       title="Open Shopify Workspace"
                     >
                       <LayoutDashboard className="h-4 w-4" />
@@ -280,18 +252,18 @@ export default function Header({
                   )}
 
                   {/* Profile Handoff Status Label */}
-                  <div className="flex flex-col text-left leading-none">
+                  <div className="hidden sm:flex flex-col text-left leading-none shrink-0">
                     <span className="text-[10px] font-bold text-neutral-900 truncate max-w-[80px]">
                       {user.name?.split(' ')[0] || 'User'}
                     </span>
-                    <span className="text-[8px] font-black text-[#D4AF37] uppercase tracking-wider">
+                    <span className="text-[8px] font-black text-[#D4AF37] uppercase tracking-wider mt-0.5">
                       {user.role}
                     </span>
                   </div>
 
                   <button
                     onClick={onSignOut}
-                    className="p-1.5 text-neutral-400 hover:text-black hover:bg-neutral-100 rounded-full transition-all"
+                    className="p-1.5 text-neutral-400 hover:text-black hover:bg-neutral-100 rounded-full transition-all shrink-0"
                     title="Sign Out"
                   >
                     <LogOut className="h-4 w-4" />
@@ -302,25 +274,50 @@ export default function Header({
           </div>
         </div>
 
-        {/* 4. Luxury Subcategory Black Ribbon Navigation (Namshi/SHEIN feel) */}
-        <div className="bg-[#1a1a1a] text-neutral-100 py-2.5 overflow-x-auto no-scrollbar border-t border-neutral-800 select-none hidden lg:block">
-          <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4 font-sans text-xs uppercase tracking-widest font-semibold shrink-0">
-            <div className="flex items-center gap-8 text-[11px]">
-              {subNavItems.map((item) => (
-                <button
-                  key={item.name}
-                  onClick={() => onSelectCategory(item.id)}
-                  className={`hover:text-gold-400 transition-colors whitespace-nowrap cursor-pointer ${
-                    activeCategory === item.id ? 'text-gold-400 underline decoration-gold-500 underline-offset-4' : ''
-                  }`}
-                >
-                  {item.name}
-                </button>
-              ))}
+        {/* 4. Elegant Mobile-Optimized Static Category Navigation Bar (resembles e-commerce reference image) */}
+        <div className="bg-white border-t border-b border-neutral-150 select-none relative z-10">
+          <div className="max-w-[1400px] mx-auto px-4 md:px-6 flex items-center justify-between gap-2">
+            <div className="flex items-center justify-start md:justify-center gap-5 md:gap-8 overflow-x-auto no-scrollbar py-2.5 flex-1 scroll-smooth">
+              {[
+                { id: '', name: 'All' },
+                { id: 'dresses', name: 'Dresses' },
+                { id: 'shoes', name: 'Shoes' },
+                { id: 'handbags', name: 'Bags' },
+                { id: 'beauty', name: 'Perfumes' },
+                { id: 'watches', name: 'Watches' },
+                { id: 'accessories', name: 'Accessories' }
+              ].map((item) => {
+                const isActive = (item.id === '' && (activeCategory === '' || activeCategory === 'all')) || activeCategory === item.id;
+                return (
+                  <button
+                    key={item.id || 'all-cat'}
+                    onClick={() => onSelectCategory(item.id)}
+                    className={`relative py-1 text-xs md:text-sm font-sans uppercase tracking-widest whitespace-nowrap cursor-pointer transition-all ${
+                      isActive 
+                        ? 'text-black font-extrabold border-b-2 border-black pb-1' 
+                        : 'text-neutral-500 font-semibold hover:text-black pb-1 border-b-2 border-transparent'
+                    }`}
+                  >
+                    <span>{item.name}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-gold-400 font-serif lowercase italic">
-              ✨ direct boutique fashion drops sourcing right now
-            </div>
+            
+            {/* Shopping Bag Button in static category menu bar */}
+            <button 
+              onClick={onOpenCart}
+              className="p-1.5 text-neutral-800 hover:bg-neutral-100 hover:text-gold-600 rounded-md shrink-0 flex items-center gap-1 transition-all active:scale-95"
+              aria-label="Open sourcing bag"
+              id="category-cart-btn"
+            >
+              <ShoppingBag className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="bg-black text-[#ffffff] text-[9px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -348,95 +345,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* 5. Mobile Fulldrawer Slide-out Navigation Menu */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          {/* Backdrop gray clickout */}
-          <div 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
-          />
-
-          {/* Drawer content */}
-          <div className="relative w-80 max-w-[85vw] bg-white h-full flex flex-col shadow-2xl z-10 transition-transform animate-slide-in">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="font-sans text-xl font-black tracking-tighter leading-none text-black">
-                  DUBAI2ADDIS
-                </span>
-                <span className="text-[9px] tracking-[0.2em] text-gold-500 uppercase font-bold mt-1 block">
-                  FASHION HOUSE
-                </span>
-              </div>
-              <button 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 text-neutral-500 hover:text-black rounded-full"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Content List */}
-            <div className="flex-1 overflow-y-auto py-4 px-2 space-y-4">
-              <div className="px-3">
-                <span className="text-[10px] font-bold tracking-[0.15em] text-neutral-400 uppercase font-sans">
-                  Sourcing Categories
-                </span>
-              </div>
-              
-              <div className="space-y-1">
-                {mainCategories.map((cat) => {
-                  const isActive = (cat.id === 'all' && activeCategory === '') || activeCategory === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        onSelectCategory(cat.id === 'all' ? '' : cat.id);
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2.5 text-sm font-sans rounded font-medium flex items-center justify-between ${
-                        isActive 
-                          ? 'bg-gold-500/15 text-gold-700 font-semibold' 
-                          : 'text-neutral-800 hover:bg-neutral-50'
-                      }`}
-                    >
-                      <span>{cat.name}</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-neutral-300" />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="border-t border-neutral-100 pt-4 px-3 space-y-3 font-sans text-xs text-neutral-600">
-                <div className="bg-gold-500/10 border border-gold-500/20 p-3 rounded text-neutral-800 space-y-1">
-                  <p className="font-semibold text-gold-700 text-xs text-center">🇪🇹 DIRECT ETHIOPIAN DISPATCH</p>
-                  <p className="text-[11px] leading-relaxed text-center">
-                    Pay upon arrival. Beautiful pieces sourced from UAE malls & designer studios to your hands.
-                  </p>
-                </div>
-
-                <div className="space-y-2.5 pt-2">
-                  <a 
-                    href="https://wa.me/971552734073" 
-                    target="_blank" 
-                    referrerPolicy="no-referrer"
-                    className="flex items-center gap-2.5 p-2 bg-emerald-50 text-emerald-800 border border-emerald-150 rounded"
-                  >
-                    <Phone className="h-4 w-4 text-emerald-600" />
-                    <span className="font-medium">WhatsApp: +971 55 273 4073</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-neutral-100 bg-neutral-50 text-center font-sans text-[11px] text-neutral-500">
-              © 2026 Dubai2Addis Fashion Brand. Sourced Luxury.
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

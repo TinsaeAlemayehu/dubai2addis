@@ -136,24 +136,12 @@ export default function ProductQuickView({
             </div>
 
             {/* Brand Title */}
-            <p className="text-[#D4AF37] font-sans tracking-widest uppercase font-black text-[10px]">{product.brand}</p>
+            <p className="text-[#a17a4c] font-sans font-bold tracking-wider uppercase text-[10px]">{product.brand}</p>
             
             {/* Dynamic Custom Header Name */}
-            <h2 className="font-sans text-xl md:text-2xl font-black uppercase tracking-tight leading-none text-black italic">
+            <h2 className="font-sans text-lg md:text-xl font-bold tracking-tight leading-snug text-black">
               {product.name}
             </h2>
-
-            {/* Rating summary */}
-            <div className="flex items-center gap-1.5 pt-0.5">
-              <div className="flex items-center text-[#D4AF37]">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className={`h-3 w-3 ${i < Math.floor(product.rating) ? 'fill-[#D4AF37] text-[#D4AF37]' : 'text-neutral-200'}`} />
-                ))}
-              </div>
-              <span className="font-sans text-[10px] font-bold text-black uppercase tracking-wider">{product.rating} / 5</span>
-              <span className="text-neutral-300">|</span>
-              <span className="font-sans text-[10px] text-neutral-400 font-bold uppercase tracking-wider">{product.reviewsCount} verified retail checks</span>
-            </div>
 
             {/* Beautiful Transparent Price Matrix */}
             <div className="bg-neutral-50 p-4 rounded-none border border-neutral-100 flex items-center justify-between gap-4">
@@ -179,9 +167,14 @@ export default function ProductQuickView({
               )}
             </div>
 
-            {/* Description Paragraph */}
-            <p className="font-sans text-[11px] uppercase tracking-wide text-neutral-600 leading-relaxed font-light">
-              {product.description}
+            {/* Description Paragraph (One line max, clean design, filtered of categories) */}
+            <p className="font-sans text-[11px] text-neutral-500 font-normal truncate" title={product.description}>
+              {product.description
+                ? product.description
+                    .replace(/\b(dresses|dress|shoes|shoe|handbags|handbag|bags|bag|watches|watch|perfumes|perfume|kaftans|kaftan|gowns|gown|abayas|abaya|heels|slides|activewear|accessories|jewelries|jewelry|sneakers|sneaker)\b/gi, '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                : ''}
             </p>
 
             {/* Color Option Selector */}

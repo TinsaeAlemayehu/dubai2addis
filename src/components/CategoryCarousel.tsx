@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { CATEGORIES } from '../data/products';
-import { Sparkles } from 'lucide-react';
 
 interface CategoryCarouselProps {
   onSelectCategory: (categoryId: string) => void;
@@ -13,77 +12,93 @@ interface CategoryCarouselProps {
 }
 
 export default function CategoryCarousel({ onSelectCategory, activeCategory }: CategoryCarouselProps) {
+  // Define exactly the 6 static categories requested plus "Shop All" to maintain perfect consistency
+  const allCategories = [
+    {
+      id: '',
+      name: 'Shop All',
+      count: '600+ Items',
+      image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=300&q=80',
+    },
+    {
+      id: 'dresses',
+      name: 'Dresses',
+      count: '124 Items',
+      image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&w=300&q=80',
+    },
+    {
+      id: 'shoes',
+      name: 'Shoes',
+      count: '85 Items',
+      image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=300&q=80',
+    },
+    {
+      id: 'handbags',
+      name: 'Bags',
+      count: '78 Items',
+      image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=300&q=80',
+    },
+    {
+      id: 'beauty',
+      name: 'Perfumes',
+      count: '62 Items',
+      image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=300&q=80',
+    },
+    {
+      id: 'watches',
+      name: 'Watches',
+      count: '35 Items',
+      image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=300&q=80',
+    },
+    {
+      id: 'accessories',
+      name: 'Accessories',
+      count: '92 Items',
+      image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=300&q=80',
+    },
+  ];
+
   return (
-    <section className="bg-white py-6 md:py-8 border-b border-neutral-100 select-none">
-      <div className="max-w-7xl mx-auto px-4 md:px-6">
-        
-        {/* Luxury Section Label */}
-        <div className="flex items-center gap-2 mb-4 md:mb-5">
-          <Sparkles className="h-4 w-4 text-[#D4AF37]" />
-          <h2 className="font-sans text-[11px] font-black tracking-[0.25em] text-neutral-900 uppercase">
-            Shop Dubai Collections by Category
-          </h2>
-        </div>
-
-        {/* Categories container */}
-        <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-3 -mx-4 px-4 md:mx-0 md:px-0 scroll-smooth">
-          {/* "See All" special circular element */}
-          <div
-            onClick={() => onSelectCategory('')}
-            className="flex flex-col items-center gap-2 cursor-pointer group shrink-0"
-          >
-            <div className={`relative h-14 w-14 rounded-full bg-gray-100 border-2 transition-all p-0.5 overflow-hidden ${
-              activeCategory === '' 
-                ? 'border-black' 
-                : 'border-transparent group-hover:border-[#D4AF37]'
-            }`}>
-              <div className="bg-neutral-950 text-[#ffffff] h-full w-full rounded-full flex flex-col items-center justify-center text-center">
-                <span className="font-sans text-[9px] font-black tracking-widest uppercase">ALL</span>
-              </div>
-            </div>
-            <span className={`text-[9px] font-bold uppercase tracking-wider text-center transition-colors group-hover:text-black ${
-              activeCategory === '' ? 'text-black' : 'text-neutral-500'
-            }`}>
-              See All
-            </span>
-          </div>
-
-          {CATEGORIES.map((cat) => {
+    <div className="bg-white border-b border-neutral-100 py-6 md:py-8 select-none">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6">
+        <div className="flex items-center gap-6 md:gap-8 overflow-x-auto no-scrollbar py-2">
+          {allCategories.map((cat) => {
             const isActive = activeCategory === cat.id;
             return (
-              <div
-                key={cat.id}
+              <button
+                key={cat.id || 'all-category'}
                 onClick={() => onSelectCategory(cat.id)}
-                className="flex flex-col items-center gap-2 cursor-pointer group shrink-0"
+                className="flex flex-col items-center space-y-2 shrink-0 group focus:outline-none cursor-pointer"
               >
-                {/* Circular image avatar */}
-                <div className={`relative h-14 w-14 rounded-full bg-gray-100 border-2 transition-all p-0.5 overflow-hidden ${
+                <div className={`relative h-16 w-16 md:h-20 md:w-20 rounded-full overflow-hidden p-0.5 border-2 transition-all duration-300 ${
                   isActive 
-                    ? 'border-black' 
-                    : 'border-transparent group-hover:border-[#D4AF37]'
+                    ? 'border-[#D4AF37] scale-105 shadow-md' 
+                    : 'border-transparent group-hover:border-neutral-300'
                 }`}>
-                  <img
-                    src={cat.image}
-                    alt={cat.name}
-                    referrerPolicy="no-referrer"
-                    className="h-full w-full object-cover rounded-full bg-gray-200"
-                  />
-                  {isActive && (
-                    <div className="absolute inset-0 bg-black/10 rounded-full" />
-                  )}
+                  <div className="h-full w-full rounded-full overflow-hidden bg-neutral-150">
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                  </div>
                 </div>
-                
-                {/* Category name layout */}
-                <span className={`text-[9px] font-bold uppercase tracking-wider text-center transition-colors group-hover:text-black ${
-                  isActive ? 'text-black' : 'text-neutral-500'
+                <span className={`text-[10px] md:text-xs font-sans uppercase tracking-widest font-black transition-colors ${
+                  isActive ? 'text-[#D4AF37]' : 'text-neutral-700 group-hover:text-black'
                 }`}>
                   {cat.name}
                 </span>
-              </div>
+                {cat.count && (
+                  <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider block">
+                    {cat.count}
+                  </span>
+                )}
+              </button>
             );
           })}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

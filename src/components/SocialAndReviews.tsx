@@ -55,7 +55,7 @@ export default function SocialAndReviews() {
     <div className="space-y-16 py-12 md:py-20 bg-white select-none">
       
       {/* 1. CUSTOMER TESTIMONIALS SECTION */}
-      <section className="max-w-7xl mx-auto px-4 md:px-6" id="testimonials">
+      <section className="max-w-[1400px] mx-auto px-4 md:px-6" id="testimonials">
         {/* Section Title */}
         <div className="text-center max-w-2xl mx-auto space-y-2.5 mb-10 md:mb-14">
           <span className="text-[#D4AF37] font-sans tracking-[0.25em] text-[10px] md:text-xs font-black uppercase block">
@@ -118,7 +118,7 @@ export default function SocialAndReviews() {
 
       {/* 2. SOCIAL PROOF COUNTER */}
       <section className="bg-neutral-950 text-white py-12 md:py-16 border-y border-neutral-900">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 divide-y-0 divide-x divide-neutral-800 text-center">
             {stats.map((st) => (
               <div key={st.id} className="space-y-1.5 md:space-y-2 py-4 md:py-0">
@@ -143,7 +143,7 @@ export default function SocialAndReviews() {
       </section>
 
       {/* 3. SNAPCHAT / INSTAGRAM LOOKBOOK GALLERY */}
-      <section className="max-w-7xl mx-auto px-4 md:px-6" id="lifestyle">
+      <section className="max-w-[1400px] mx-auto px-4 md:px-6" id="lifestyle">
         {/* Section Title */}
         <div className="text-center max-w-2xl mx-auto space-y-2.5 mb-10 md:mb-14">
           <span className="text-[#D4AF37] font-sans tracking-[0.25em] text-[10px] md:text-xs font-black uppercase block">

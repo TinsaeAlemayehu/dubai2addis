@@ -65,6 +65,17 @@ export const requireAuth = async (
     const emailLower = email.toLowerCase();
     let dbUserList = await db.select().from(users).where(eq(users.uid, decodedToken.uid));
 
+    if (dbUserList.length === 0 && emailLower) {
+      const existingByEmail = await db.select().from(users).where(eq(users.email, emailLower));
+      if (existingByEmail.length > 0) {
+        const updatedUser = await db.update(users)
+          .set({ uid: decodedToken.uid })
+          .where(eq(users.id, existingByEmail[0].id))
+          .returning();
+        dbUserList = updatedUser;
+      }
+    }
+
     if (dbUserList.length === 0) {
       // First registered user or specific email is Super Admin
       let role = 'CUSTOMER';

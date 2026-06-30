@@ -37,7 +37,12 @@ import {
   Key,
   Mail,
   ShieldAlert,
-  Sparkle
+  Sparkle,
+  Eye,
+  EyeOff,
+  Lock,
+  Phone,
+  User
 } from 'lucide-react';
 
 export default function App() {
@@ -61,6 +66,12 @@ export default function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Persistence states
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
@@ -129,7 +140,7 @@ export default function App() {
       setShowAuthModal(false);
     } catch (err: any) {
       console.error(err);
-      setAuthError('Google Sign-In blocked by your browser environment. Please try the credentials bypass options below!');
+      setAuthError('Google Sign-In blocked by your browser environment or third-party popup restrictions.');
     } finally {
       setAuthLoading(false);
     }
@@ -140,9 +151,30 @@ export default function App() {
     e.preventDefault();
     setAuthLoading(true);
     setAuthError('');
+    
+    if (isRegistering) {
+      if (password !== confirmPassword) {
+        setAuthError('Passwords do not match.');
+        setAuthLoading(false);
+        return;
+      }
+      if (!agreeTerms) {
+        setAuthError('You must agree to the Terms & Conditions and Privacy Policy.');
+        setAuthLoading(false);
+        return;
+      }
+    }
+
     try {
       if (isRegistering) {
-        const regRes = await apiClient.register({ email, password });
+        // Build the full phone string with +251 flag prefix
+        const fullPhone = phoneNumber ? `+251${phoneNumber.replace(/^\+251/, '').trim()}` : '';
+        const regRes = await apiClient.register({ 
+          email, 
+          password, 
+          name: fullName, 
+          phone: fullPhone 
+        });
         if (regRes.localToken) {
           localStorage.setItem('local_auth_token', regRes.localToken);
         }
@@ -173,50 +205,13 @@ export default function App() {
       setShowAuthModal(false);
       setEmail('');
       setPassword('');
+      setFullName('');
+      setPhoneNumber('');
+      setConfirmPassword('');
+      setAgreeTerms(false);
     } catch (err: any) {
       console.error(err);
       setAuthError(err.message || 'Authentication failed. Check credentials.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  // Quick bypass for development and testing in iframe environments
-  const handleQuickBypassLogin = async (roleType: 'SUPER_ADMIN' | 'STAFF' | 'CUSTOMER') => {
-    setAuthLoading(true);
-    setAuthError('');
-    const customEmail = `${roleType.toLowerCase()}@dubai2addis.com`;
-    const passwordBypass = 'Dub2AddisSecurePass1!';
-    
-    try {
-      const loginRes = await apiClient.login({ email: customEmail, password: passwordBypass });
-      if (loginRes.localToken) {
-        localStorage.setItem('local_auth_token', loginRes.localToken);
-      }
-      if (loginRes.user) {
-        localStorage.setItem('local_auth_user', JSON.stringify(loginRes.user));
-        setUser(loginRes.user);
-      }
-      try {
-        await signInWithCustomToken(auth, loginRes.customToken);
-      } catch (authErr) {
-        console.warn('Firebase Custom Token sign-in failed during bypass, continuing with local session:', authErr);
-      }
-      
-      // Let's force synchronize profile role
-      setTimeout(async () => {
-        try {
-          await apiClient.updateProfile({ role: roleType, name: `${roleType.charAt(0) + roleType.slice(1).toLowerCase()} Simulator` });
-          const profile = await apiClient.getProfile();
-          setUser(profile);
-          localStorage.setItem('local_auth_user', JSON.stringify(profile));
-        } catch (e) {}
-      }, 500);
-
-      setShowAuthModal(false);
-    } catch (err: any) {
-      console.error(err);
-      setAuthError('Bypass login failed: ' + err.message);
     } finally {
       setAuthLoading(false);
     }
@@ -468,7 +463,7 @@ export default function App() {
       />
 
       {/* Grid containing filtering, deals & products */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-12" ref={productsSectionRef}>
+      <main className="flex-1 max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-12" ref={productsSectionRef} id="marketplace-catalog">
         
         {/* Marketplace banner section (Colloquial Namshi / Centrepoint vibe) */}
         {!searchQuery && !selectedCategory && (
@@ -666,7 +661,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 md:gap-8">
               {filteredProducts.map((prod) => (
                 <ProductCard
                   key={prod.id}
@@ -675,6 +670,11 @@ export default function App() {
                   onToggleWishlist={() => handleToggleWishlist(prod)}
                   onQuickView={() => setQuickViewProduct(prod)}
                   onOrderWhatsApp={() => handleSingleProductWhatsApp(prod)}
+                  onAddToCart={() => {
+                    const size = prod.sizes?.[0] || 'One Size';
+                    const color = prod.colors?.[0] || { name: 'Default', hex: '#ccc' };
+                    handleAddToCart(prod, size, color, 1);
+                  }}
                 />
               ))}
             </div>
@@ -727,154 +727,256 @@ export default function App() {
       )}
 
       {/* 4. Elegant Authentication Dialogue Popover with Quick bypass simulation buttons */}
-      {showAuthModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 overflow-y-auto flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-none border border-neutral-100 shadow-2xl p-6 relative font-sans">
-            <button
-              onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-neutral-400 hover:text-black p-1 transition-all"
-            >
-              <X className="h-5 w-5" />
-            </button>
+      {showAuthModal && (() => {
+        const getPasswordStrength = (pass: string) => {
+          if (!pass) return { level: 0, label: '', color: 'bg-neutral-200' };
+          if (pass.length < 6) return { level: 1, label: 'Weak', color: 'bg-red-500' };
+          const hasNumber = /\d/.test(pass);
+          const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+          const hasMixed = /[a-z]/.test(pass) && /[A-Z]/.test(pass);
+          if (pass.length >= 8 && hasNumber && hasSpecial && hasMixed) {
+            return { level: 3, label: 'Strong', color: 'bg-emerald-500' };
+          }
+          return { level: 2, label: 'Medium', color: 'bg-amber-500' };
+        };
 
-            <div className="text-center space-y-2 mb-6">
-              <div className="inline-flex h-10 w-10 bg-[#D4AF37]/15 text-gold-700 items-center justify-center rounded-none mb-1">
-                <Sparkle className="h-5 w-5 fill-[#D4AF37]" />
-              </div>
-              <h3 className="font-sans font-black text-sm tracking-widest uppercase text-black">
-                {isRegistering ? 'CREATE FASHION ID' : 'AUTHENTICATE FASHION ID'}
-              </h3>
-              <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">
-                Sync wishlists & unlock express Dubia sourcing orders.
-              </p>
-            </div>
+        const strength = getPasswordStrength(password);
 
-            {authError && (
-              <div className="bg-red-50 border border-red-100 text-red-800 p-3 mb-4 rounded-none text-[10px] font-bold uppercase flex items-start gap-2">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-red-650" />
-                <span>{authError}</span>
-              </div>
-            )}
-
-            {/* Email Form */}
-            <form onSubmit={handleEmailAuthSubmit} className="space-y-4 text-xs font-sans">
-              <div className="space-y-1 block">
-                <label className="font-black text-neutral-700 uppercase text-[9px] tracking-wider block">Email Address</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    placeholder="name@example.com"
-                    className="w-full bg-white p-2.5 pl-9 border border-neutral-250 rounded-none focus:outline-none focus:border-black"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                  />
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
-                </div>
-              </div>
-
-              <div className="space-y-1 block">
-                <label className="font-black text-neutral-700 uppercase text-[9px] tracking-wider block">Password</label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    className="w-full bg-white p-2.5 pl-9 border border-neutral-250 rounded-none focus:outline-none focus:border-black"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                  />
-                  <Key className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
-                </div>
-              </div>
-
-              {/* Secure Administrative Credentials Info Block */}
-              <div className="p-2.5 bg-neutral-50 border border-neutral-200 text-neutral-600 text-[9px] uppercase tracking-wider font-extrabold space-y-1 rounded-none leading-relaxed">
-                <span className="text-[#D4AF37] block">✦ ADMIN PROFILE ACCESS KEYS:</span>
-                <div>Emails: <code className="text-black bg-neutral-100 px-1 rounded font-mono font-bold">goodtinsae@gmail.com</code> / <code className="text-black bg-neutral-100 px-1 rounded font-mono font-bold">itistinsae@gmail.com</code></div>
-                <div>Password: <code className="text-black bg-neutral-100 px-1 rounded font-mono font-bold">atinzzz</code></div>
-              </div>
-
+        return (
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 overflow-y-auto flex items-center justify-center p-4">
+            <div className="bg-white w-[90%] md:w-full max-w-[480px] rounded-[12px] shadow-xl p-6 md:p-10 relative font-sans animate-in fade-in zoom-in-95 duration-250">
+              {/* Close Button */}
               <button
-                type="submit"
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-4 right-4 text-neutral-400 hover:text-black p-1 transition-all"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Header Container */}
+              <div className="flex flex-col items-center text-center mb-6">
+                {/* Logo */}
+                <span className="font-sans text-xl md:text-2xl font-black tracking-tighter leading-none text-black uppercase">
+                  Dubai2Addis
+                </span>
+                <span className="text-[9px] tracking-[0.3em] text-[#C9A84C] uppercase font-black mt-1 block">
+                  Fashion House
+                </span>
+
+                {/* Title and Subtitle */}
+                <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 mt-5 tracking-tight">
+                  {isRegistering ? 'Create your account' : 'Welcome back'}
+                </h3>
+                <p className="text-sm text-neutral-500 mt-1">
+                  {isRegistering ? 'Join Dubai2Addis Fashion House' : 'Sign in to your account'}
+                </p>
+              </div>
+
+              {authError && (
+                <div className="bg-red-50 border border-red-150 text-red-800 p-3.5 mb-5 rounded-[6px] text-xs flex items-start gap-2.5">
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-red-650 mt-0.5" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              {/* Form */}
+              <form onSubmit={handleEmailAuthSubmit} className="space-y-4">
+                {isRegistering && (
+                  /* Full Name field */
+                  <div className="space-y-1 block">
+                    <label className="text-xs font-semibold text-neutral-700 block">Full name</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter your name"
+                        className="w-full bg-white h-[52px] px-4 border border-[#ddd] rounded-[6px] text-sm focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all"
+                        value={fullName}
+                        onChange={e => setFullName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Email field */}
+                <div className="space-y-1 block">
+                  <label className="text-xs font-semibold text-neutral-700 block">Email address</label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      required
+                      placeholder="Enter your email"
+                      className="w-full bg-white h-[52px] px-4 border border-[#ddd] rounded-[6px] text-sm focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {isRegistering && (
+                  /* Phone Number field with +251 Ethiopia flag prefix */
+                  <div className="space-y-1 block">
+                    <label className="text-xs font-semibold text-neutral-700 block">Phone number</label>
+                    <div className="flex rounded-[6px] border border-[#ddd] overflow-hidden focus-within:border-[#C9A84C] focus-within:ring-1 focus-within:ring-[#C9A84C] transition-all">
+                      <span className="bg-neutral-50 border-r border-[#ddd] px-3 flex items-center text-sm font-medium text-neutral-500 select-none">
+                        🇪🇹 +251
+                      </span>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="912345678"
+                        className="w-full bg-white h-[50px] px-3 text-sm focus:outline-none transition-all"
+                        value={phoneNumber}
+                        onChange={e => setPhoneNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Password field */}
+                <div className="space-y-1 block">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-semibold text-neutral-700 block">Password</label>
+                    {!isRegistering && (
+                      <a href="#" className="text-xs font-medium text-[#C9A84C] hover:underline">
+                        Forgot password?
+                      </a>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Enter your password"
+                      className="w-full bg-white h-[52px] pl-4 pr-11 border border-[#ddd] rounded-[6px] text-sm focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {isRegistering && (
+                  <>
+                    {/* Password Strength Indicator */}
+                    {password && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-neutral-500">Password strength:</span>
+                          <span className={
+                            strength.level === 1 ? 'text-red-500 font-semibold' :
+                            strength.level === 2 ? 'text-amber-500 font-semibold' :
+                            'text-emerald-500 font-semibold'
+                          }>
+                            {strength.label}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${strength.color}`} 
+                            style={{ width: strength.level === 1 ? '33.3%' : strength.level === 2 ? '66.6%' : '100%' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Confirm Password field */}
+                    <div className="space-y-1 block">
+                      <label className="text-xs font-semibold text-neutral-700 block">Confirm password</label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Confirm your password"
+                          className="w-full bg-white h-[52px] pl-4 pr-11 border border-[#ddd] rounded-[6px] text-sm focus:outline-none focus:border-[#C9A84C] focus:ring-1 focus:ring-[#C9A84C] transition-all"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Terms Checkbox */}
+                    <div className="pt-1">
+                      <label className="flex items-start gap-2.5 text-xs text-neutral-600 cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          checked={agreeTerms}
+                          onChange={(e) => setAgreeTerms(e.target.checked)}
+                          className="mt-0.5 rounded border-neutral-350 text-[#C9A84C] focus:ring-[#C9A84C] h-4 w-4"
+                        />
+                        <span>
+                          I agree to the <a href="#" className="text-[#C9A84C] hover:underline font-medium">Terms & Conditions</a> and <a href="#" className="text-[#C9A84C] hover:underline font-medium">Privacy Policy</a>
+                        </span>
+                      </label>
+                    </div>
+                  </>
+                )}
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-[#111] hover:bg-black font-sans font-bold text-sm tracking-wide text-white h-[52px] rounded-[6px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#111] uppercase"
+                >
+                  {authLoading ? 'Please wait...' : (isRegistering ? 'Create account' : 'Sign in')}
+                </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative flex py-5 items-center">
+                <div className="flex-grow border-t border-neutral-200"></div>
+                <span className="flex-shrink mx-4 text-neutral-400 text-xs font-medium">
+                  or continue with
+                </span>
+                <div className="flex-grow border-t border-neutral-200"></div>
+              </div>
+
+              {/* Google login button */}
+              <button
+                onClick={handleGoogleSignIn}
                 disabled={authLoading}
-                className="w-full bg-black hover:bg-[#D4AF37] hover:text-black font-sans font-extrabold uppercase text-[10px] tracking-wider text-white py-3 transition-colors rounded-none"
+                className="w-full border border-neutral-300 bg-white hover:bg-neutral-50 h-[52px] rounded-[6px] text-sm font-medium flex items-center justify-center gap-2.5 transition-all text-neutral-700"
               >
-                {authLoading ? 'Verifying...' : (isRegistering ? 'Register Fashion Account' : 'Login Securely')}
+                <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.62 0 3.08.56 4.22 1.64l3.15-3.15C17.41 1.7 14.9 1 12 1 7.24 1 3.2 3.73 1.3 7.74l3.78 2.93c.89-2.67 3.39-4.63 6.92-4.63z" />
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.67 2.84c2.15-1.98 3.38-4.89 3.38-8.49z" />
+                  <path fill="#FBBC05" d="M5.08 14.67c-.23-.69-.36-1.43-.36-2.17s.13-1.48.36-2.17L1.3 7.4A10.975 10.975 0 000 12.5c0 1.94.51 3.76 1.4 5.37l3.68-2.93-1.3-.3z" />
+                  <path fill="#34A853" d="M12 23c3.1 0 5.71-1.03 7.61-2.79l-3.67-2.84c-1.02.68-2.33 1.09-3.94 1.09-3.53 0-6.03-1.96-6.92-4.63L1.3 16.76C3.2 20.77 7.24 23 12 23z" />
+                </svg>
+                <span>Continue with Google</span>
               </button>
-            </form>
 
-            <div className="text-center mt-3 text-[10px]">
-              <button
-                onClick={() => setIsRegistering(!isRegistering)}
-                className="font-bold underline text-neutral-500 hover:text-black uppercase tracking-wider"
-              >
-                {isRegistering ? 'Already have an ID? Login' : "Don't have an account? Sign Up"}
-              </button>
+              {/* Bottom Switch Link */}
+              <div className="text-center mt-6">
+                <button
+                  onClick={() => {
+                    setIsRegistering(!isRegistering);
+                    setAuthError('');
+                  }}
+                  className="text-sm font-semibold text-[#C9A84C] hover:underline"
+                >
+                  {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                </button>
+              </div>
+
             </div>
-
-            {/* Google Popup login (Works on new tab, but may get popups blocked inside iframe) */}
-            <div className="relative flex py-4 items-center">
-              <div className="flex-grow border-t border-neutral-200"></div>
-              <span className="flex-shrink mx-4 text-neutral-400 text-[8px] uppercase tracking-widest font-black">OR LOG IN WITH GOOGLE</span>
-              <div className="flex-grow border-t border-neutral-200"></div>
-            </div>
-
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={authLoading}
-              className="w-full border border-neutral-300 hover:bg-neutral-50 p-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all rounded-none"
-            >
-              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12 5.04c1.62 0 3.08.56 4.22 1.64l3.15-3.15C17.41 1.7 14.9 1 12 1 7.24 1 3.2 3.73 1.3 7.74l3.78 2.93c.89-2.67 3.39-4.63 6.92-4.63z" />
-                <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.67 2.84c2.15-1.98 3.38-4.89 3.38-8.49z" />
-                <path fill="#FBBC05" d="M5.08 14.67c-.23-.69-.36-1.43-.36-2.17s.13-1.48.36-2.17L1.3 7.4A10.975 10.975 0 000 12.5c0 1.94.51 3.76 1.4 5.37l3.68-2.93-1.3-.3z" />
-                <path fill="#34A853" d="M12 23c3.1 0 5.71-1.03 7.61-2.79l-3.67-2.84c-1.02.68-2.33 1.09-3.94 1.09-3.53 0-6.03-1.96-6.92-4.63L1.3 16.76C3.2 20.77 7.24 23 12 23z" />
-              </svg>
-              <span>Popup Google Auth</span>
-            </button>
-
-            {/* HIGH-QUALITY ROLES WORKSPACE SIMULATOR (Solves iframe restrictions flawlessly!) */}
-            <div className="relative flex py-4 items-center">
-              <div className="flex-grow border-t border-neutral-200"></div>
-              <span className="flex-shrink mx-4 text-amber-500 text-[8px] uppercase tracking-widest font-black">IFRAME SIMULATION & INTERACTIVES</span>
-              <div className="flex-grow border-t border-neutral-200"></div>
-            </div>
-
-            <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider text-center leading-normal mb-3">
-              Standard popups are often blocked inside sandboxed preview iframes. Use these high-fidelity quick role selector simulator logins to immediately test role-based authorizations!
-            </p>
-
-            <div className="grid grid-cols-3 gap-1.5 font-sans">
-              <button
-                type="button"
-                onClick={() => handleQuickBypassLogin('SUPER_ADMIN')}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase py-2 tracking-wide block transition-colors"
-                title="Log in as Super Admin"
-              >
-                Super Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickBypassLogin('STAFF')}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[9px] uppercase py-2 tracking-wide block transition-colors"
-                title="Log in as Staff operator"
-              >
-                Staff
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickBypassLogin('CUSTOMER')}
-                className="bg-neutral-800 hover:bg-black text-white font-extrabold text-[9px] uppercase py-2 tracking-wide block transition-colors"
-                title="Log in as Standard Customer"
-              >
-                Customer
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 3. Global Floating WhatsApp Green Pulse Button */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col items-center gap-3">
