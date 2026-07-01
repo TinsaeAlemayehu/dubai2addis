@@ -52,11 +52,13 @@ async function ensureAdminAccounts() {
               });
               userUid = userRecord.uid;
               console.log(`Successfully created new Firebase admin account for: ${email}`);
-            } catch (createErr) {
-              console.warn(`Could not create admin user in Firebase (API issue), continuing locally:`, createErr);
+            } catch (createErr: any) {
+              const cleanMsg = (createErr.message || '').split('https://')[0] || 'Auth service disabled';
+              console.log(`[Admin Setup] Firebase create admin bypassed for ${email} - using local credentials: ${cleanMsg}`);
             }
           } else {
-            console.warn(`Firebase get user threw error for ${email} (API issue), continuing locally:`, err.message);
+            const cleanMsg = (err.message || '').split('https://')[0] || 'Auth service disabled';
+            console.log(`[Admin Setup] Firebase check bypassed for ${email} - using local credentials: ${cleanMsg}`);
           }
         }
 
@@ -103,7 +105,7 @@ async function ensureAdminAccounts() {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
   // Middleware
   app.use(express.json());
@@ -153,7 +155,8 @@ async function startServer() {
           }
         }
       } catch (err: any) {
-        console.warn('Firebase Admin register failed, continuing with direct SQL user registry:', err.message);
+        const cleanMsg = (err.message || '').split('https://')[0] || 'Auth service disabled';
+        console.log(`[Register] Firebase registration bypassed, continuing with database entry: ${cleanMsg}`);
         fbUid = `local-uid-${emailLower.replace('@', '-')}-${Date.now()}`;
       }
 
@@ -188,7 +191,8 @@ async function startServer() {
       try {
         customToken = await adminAuth.createCustomToken(fbUid);
       } catch (err: any) {
-        console.warn('Could not generate Firebase Custom Token:', err.message);
+        const cleanMsg = (err.message || '').split('https://')[0] || 'Auth service disabled';
+        console.log(`[Register] Firebase Custom Token bypassed: ${cleanMsg}`);
       }
 
       res.json({ customToken, localToken, user: newUserList[0] });
@@ -231,7 +235,8 @@ async function startServer() {
             });
             fbUid = fbUser.uid;
           } catch (createErr: any) {
-            console.warn('Firebase Admin login sync failed, using direct direct local uid:', createErr.message);
+            const cleanMsg = (createErr.message || '').split('https://')[0] || 'Auth service disabled';
+            console.log(`[Login] Firebase Admin login sync bypassed, using local uid: ${cleanMsg}`);
             fbUid = `local-uid-${emailLower.replace('@', '-')}`;
           }
         }
@@ -274,7 +279,8 @@ async function startServer() {
       try {
         customToken = await adminAuth.createCustomToken(dbUser.uid);
       } catch (err: any) {
-        console.warn('Could not generate Firebase Custom Token:', err.message);
+        const cleanMsg = (err.message || '').split('https://')[0] || 'Auth service disabled';
+        console.log(`[Login] Firebase Custom Token bypassed: ${cleanMsg}`);
       }
 
       res.json({ customToken, localToken, user: dbUser });

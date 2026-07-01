@@ -124,8 +124,9 @@ export const requireAuth = async (
     }
 
     next();
-  } catch (error) {
-    console.error('Error verifying ID token:', error);
+  } catch (error: any) {
+    const cleanMsg = (error?.message || '').split('https://')[0] || 'Token verification bypassed or invalid';
+    console.log(`[Auth Middleware] Token verification bypassed/invalid: ${cleanMsg}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };
