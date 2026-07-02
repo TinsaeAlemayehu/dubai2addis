@@ -147,7 +147,7 @@ export default function SocialAndReviews() {
         {/* Section Title */}
         <div className="text-center max-w-2xl mx-auto space-y-2.5 mb-10 md:mb-14">
           <span className="text-[#D4AF37] font-sans tracking-[0.25em] text-[10px] md:text-xs font-black uppercase block">
-            @Dubai2AddisFashion
+            @AddisDubaiFashion
           </span>
           <h2 className="font-sans text-2xl md:text-3xl font-black tracking-tighter text-black uppercase leading-tight italic">
             Style Inspiration Lookbook
@@ -197,7 +197,7 @@ export default function SocialAndReviews() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-1 select-none pt-2">
             <a
-              href="https://wa.me/251911000000?text=Hello%20Dubai2Addis!%20I%20have%20custom%20links%20and%20screenshots%20of%20items%20I%20want%20to%20source%20directly%20from%20Dubai."
+              href="https://wa.me/251911000000?text=Hello%20AddisDubai!%20I%20have%20custom%20links%20and%20screenshots%20of%20items%20I%20want%20to%20source%20directly%20from%20Dubai."
               target="_blank"
               referrerPolicy="no-referrer"
               className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-[#ffffff] font-sans font-black text-[10px] tracking-widest uppercase py-4 px-8 rounded-none flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 cursor-pointer border border-[#D4AF37]/10"

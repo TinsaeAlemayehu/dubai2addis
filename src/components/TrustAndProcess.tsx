@@ -197,7 +197,7 @@ export default function TrustAndProcess() {
               </p>
             </div>
             <a
-              href="https://wa.me/251911000000?text=Hello%20Dubai2Addis!%20I%20have%20product%20links%20from%20Dubai%20stores%20I%20would%20like%20to%20order."
+              href="https://wa.me/251911000000?text=Hello%20AddisDubai!%20I%20have%20product%20links%20from%20Dubai%20stores%20I%20would%20like%20to%20order."
               target="_blank"
               referrerPolicy="no-referrer"
               className="bg-black hover:bg-[#C9A84C] hover:text-black text-white px-6 py-3 rounded-[6px] font-sans font-bold text-xs uppercase tracking-wider transition-all duration-200 shrink-0 text-center block w-full sm:w-auto active:scale-95"

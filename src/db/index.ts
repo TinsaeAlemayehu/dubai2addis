@@ -81,6 +81,7 @@ pool.query('SELECT 1')
         quantity_available INTEGER DEFAULT 10,
         quantity_reserved INTEGER DEFAULT 0,
         low_stock_threshold INTEGER DEFAULT 3,
+        status TEXT DEFAULT 'Published',
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -108,10 +109,45 @@ pool.query('SELECT 1')
         active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS settings (
+        id SERIAL PRIMARY KEY,
+        site_name TEXT NOT NULL DEFAULT 'AddisDubai',
+        logo_url TEXT DEFAULT '',
+        whatsapp_number TEXT NOT NULL DEFAULT '+971552734073',
+        currency TEXT NOT NULL DEFAULT 'ETB',
+        delivery_fee TEXT NOT NULL DEFAULT '200',
+        support_email TEXT NOT NULL DEFAULT 'info@addisdubai.com',
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS purchase_tasks (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER NOT NULL REFERENCES orders(id),
+        product_sku TEXT NOT NULL,
+        product_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        selected_size TEXT,
+        selected_color TEXT,
+        supplier_id TEXT,
+        supplier_price_aed INTEGER,
+        purchase_status TEXT NOT NULL DEFAULT 'TO_PURCHASE',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
     `;
 
     try {
       await pool.query(createTablesDdl);
+      // Run safe migration to add status column if it doesn't exist
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Published';");
+      // Seed default settings row if not exists
+      await pool.query(`
+        INSERT INTO settings (id, site_name, logo_url, whatsapp_number, currency, delivery_fee, support_email)
+        VALUES (1, 'AddisDubai', '', '+971552734073', 'ETB', '200', 'info@addisdubai.com')
+        ON CONFLICT (id) DO NOTHING;
+      `);
       console.log('Database tables verified/created successfully.');
       isSqlConnected = true;
       realDb = drizzle(pool, { schema });

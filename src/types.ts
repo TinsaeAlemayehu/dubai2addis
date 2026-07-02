@@ -46,3 +46,31 @@ export interface BrandPartner {
   tagline: string;
   logoUrl?: string;
 }
+
+export interface StoreSettings {
+  siteName: string;
+  logoUrl?: string;
+  whatsappNumber: string;
+  currency: string;
+  deliveryFee: string;
+  supportEmail: string;
+  updatedAt?: string | Date;
+}
+
+export interface PurchaseTask {
+  id: number;
+  orderId: number;
+  productSku: string;
+  productName: string;
+  quantity: number;
+  selectedSize?: string;
+  selectedColor?: string;
+  supplierId?: string;
+  supplierPriceAED?: number;
+  purchaseStatus: 'TO_PURCHASE' | 'PURCHASED' | 'PACKED' | 'READY_FOR_SHIPMENT';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+

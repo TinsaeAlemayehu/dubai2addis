@@ -41,6 +41,7 @@ export const products = pgTable('products', {
   quantityAvailable: integer('quantity_available').default(10),
   quantityReserved: integer('quantity_reserved').default(0),
   lowStockAlertThreshold: integer('low_stock_threshold').default(3),
+  status: text('status').default('Published'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -82,3 +83,41 @@ export const ordersRelations = relations(orders, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// Store Settings table (Single row system settings)
+export const settings = pgTable('settings', {
+  id: serial('id').primaryKey(),
+  siteName: text('site_name').notNull().default('AddisDubai'),
+  logoUrl: text('logo_url').default(''),
+  whatsappNumber: text('whatsapp_number').notNull().default('+971552734073'),
+  currency: text('currency').notNull().default('ETB'),
+  deliveryFee: text('delivery_fee').notNull().default('200'),
+  supportEmail: text('support_email').notNull().default('info@addisdubai.com'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Purchase Tasks Table for the Purchase Queue
+export const purchaseTasks = pgTable('purchase_tasks', {
+  id: serial('id').primaryKey(),
+  orderId: integer('order_id').notNull().references(() => orders.id),
+  productSku: text('product_sku').notNull(),
+  productName: text('product_name').notNull(),
+  quantity: integer('quantity').notNull().default(1),
+  selectedSize: text('selected_size'),
+  selectedColor: text('selected_color'), // Color details
+  supplierId: text('supplier_id'),
+  supplierPriceAED: integer('supplier_price_aed'),
+  purchaseStatus: text('purchase_status').notNull().default('TO_PURCHASE'), // 'TO_PURCHASE', 'PURCHASED', 'PACKED', 'READY_FOR_SHIPMENT'
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const purchaseTasksRelations = relations(purchaseTasks, ({ one }) => ({
+  order: one(orders, {
+    fields: [purchaseTasks.orderId],
+    references: [orders.id],
+  }),
+}));
+
+

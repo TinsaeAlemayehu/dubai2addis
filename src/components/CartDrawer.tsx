@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { CartItem, Product } from '../types';
+import { CartItem, Product, StoreSettings } from '../types';
 import { EXCHANGE_RATE_ETB } from '../data/products';
 import { apiClient } from '../lib/api.ts';
 import { 
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 interface CartDrawerProps {
+  storeSettings?: StoreSettings;
   isOpen: boolean;
   onClose: () => void;
   cartItems: CartItem[];
@@ -36,6 +37,7 @@ interface CartDrawerProps {
 }
 
 export default function CartDrawer({
+  storeSettings,
   isOpen,
   onClose,
   cartItems,
@@ -71,8 +73,9 @@ export default function CartDrawer({
 
   const subtotalETB = cartItems.reduce((acc, item) => acc + (getProdPriceETB(item.product) * item.quantity), 0);
   
-  // Shipping calculations: Free above 36500 ETB, otherwise 1825 ETB flat courier fee
-  const shippingETB = subtotalETB >= 36500 ? 0 : (subtotalETB === 0 ? 0 : 1825);
+  // Shipping calculations: Free above 36500 ETB, otherwise flat courier fee from settings
+  const deliveryFeeNum = Number(storeSettings?.deliveryFee || '1825');
+  const shippingETB = subtotalETB >= 36500 ? 0 : (subtotalETB === 0 ? 0 : deliveryFeeNum);
 
   const grandTotalETB = subtotalETB + shippingETB;
 
@@ -110,16 +113,18 @@ export default function CartDrawer({
       itemsText += `${index + 1}. ${item.product.name} (Product ID: ${item.product.id}, Size: ${item.selectedSize}, Color: ${item.selectedColor.name}) - ${itemPrice.toLocaleString()} ETB\n`;
     });
 
-    const textMessage = `Hello Dubai2Addis Fashion,\n\n` +
+    const siteName = storeSettings?.siteName || 'AddisDubai';
+    const textMessage = `Hello ${siteName} Fashion,\n\n` +
       `I would like to order:\n\n` +
       itemsText + `\n` +
-      `Total: ${grandTotalETB.toLocaleString()} ETB\n\n` +
+      `Total: ${grandTotalETB.toLocaleString()} ${storeSettings?.currency || 'ETB'}\n\n` +
       `Please send deposit payment instructions.\n\n` +
       `Customer Name: ${customerName || 'Guest'}\n` +
       `Shipping City: ${shippingCity}`;
 
     const encodedMessage = encodeURIComponent(textMessage);
-    window.open(`https://wa.me/971552734073?text=${encodedMessage}`, '_blank', 'referrer');
+    const cleanedPhone = (storeSettings?.whatsappNumber || '971552734073').replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${cleanedPhone}?text=${encodedMessage}`, '_blank', 'referrer');
   };
 
   return (
@@ -398,7 +403,7 @@ export default function CartDrawer({
               <div className="flex justify-between items-center text-neutral-600 uppercase font-bold tracking-wide text-[10px]">
                 <span>Items Subtotal:</span>
                 <span className="font-extrabold text-neutral-900 text-right text-sm">
-                  {subtotalETB.toLocaleString()} ETB
+                  {subtotalETB.toLocaleString()} {storeSettings?.currency || 'ETB'}
                 </span>
               </div>
 
@@ -413,7 +418,7 @@ export default function CartDrawer({
                     <span className="text-emerald-750 font-black bg-emerald-50 px-2 py-0.5 rounded-none flex items-center justify-center">FREE</span>
                   ) : (
                     <span className="text-sm">
-                      {shippingETB.toLocaleString()} ETB
+                      {shippingETB.toLocaleString()} {storeSettings?.currency || 'ETB'}
                     </span>
                   )}
                 </span>
@@ -424,7 +429,7 @@ export default function CartDrawer({
                 <span className="font-black text-black tracking-widest uppercase">Estimated Total:</span>
                 <div className="text-right">
                   <span className="font-black text-emerald-700 text-base block font-sans animate-pulse">
-                    {grandTotalETB.toLocaleString()} ETB
+                    {grandTotalETB.toLocaleString()} {storeSettings?.currency || 'ETB'}
                   </span>
                 </div>
               </div>

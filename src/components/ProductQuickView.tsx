@@ -43,7 +43,7 @@ export default function ProductQuickView({
   };
 
   const handleDirectWhatsApp = () => {
-    const textMessage = `Hello Dubai2Addis Fashion,\n\n` +
+    const textMessage = `Hello AddisDubai Fashion,\n\n` +
       `I would like to order:\n` +
       `1. ${product.name} (ID: ${product.id}) - ${convertedPriceETB.toLocaleString()} ETB\n` +
       `   * Size: ${selectedSize}\n` +

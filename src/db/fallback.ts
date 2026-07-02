@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { users, products, orders, banners } from './schema.ts';
+import { users, products, orders, banners, settings, purchaseTasks } from './schema.ts';
 
 const FALLBACK_DB_PATH = path.join(process.cwd(), 'src', 'db', 'fallback_db.json');
 
 // Normalizing column names to row properties
 function getRowValue(row: any, dbColName: string): any {
+  if (dbColName === 'status' && !row[dbColName]) return 'Published';
   if (dbColName in row) return row[dbColName];
   
   // Convert snake_case to camelCase
@@ -31,7 +32,21 @@ function getRowValue(row: any, dbColName: string): any {
     'total_amount_etb': 'totalAmountETB',
     'shipping_address': 'shippingAddress',
     'shipping_city': 'shippingCity',
-    'image_url': 'imageUrl'
+    'image_url': 'imageUrl',
+    'site_name': 'siteName',
+    'logo_url': 'logoUrl',
+    'whatsapp_number': 'whatsappNumber',
+    'delivery_fee': 'deliveryFee',
+    'support_email': 'supportEmail',
+    'updated_at': 'updatedAt',
+    'order_id': 'orderId',
+    'product_sku': 'productSku',
+    'product_name': 'productName',
+    'selected_size': 'selectedSize',
+    'selected_color': 'selectedColor',
+    'supplier_id': 'supplierId',
+    'supplier_price_aed': 'supplierPriceAED',
+    'purchase_status': 'purchaseStatus'
   };
   
   const mappedKey = manualMappings[dbColName];
@@ -114,6 +129,8 @@ function getTableName(table: any): string {
   if (table === products) return 'products';
   if (table === orders) return 'orders';
   if (table === banners) return 'banners';
+  if (table === settings) return 'settings';
+  if (table === purchaseTasks) return 'purchase_tasks';
   
   if (table && typeof table === 'object') {
     const name = table[Symbol.for('drizzle:Name')] || table.tableName || (table._ && table._.name);
@@ -387,7 +404,20 @@ export function loadStore(): any {
           active: true,
           createdAt: new Date().toISOString()
         }
-      ]
+      ],
+      settings: [
+        {
+          id: 1,
+          siteName: 'AddisDubai',
+          logoUrl: '',
+          whatsappNumber: '+971552734073',
+          currency: 'ETB',
+          deliveryFee: '200',
+          supportEmail: 'info@addisdubai.com',
+          updatedAt: new Date().toISOString()
+        }
+      ],
+      purchase_tasks: []
     };
     fs.mkdirSync(path.dirname(FALLBACK_DB_PATH), { recursive: true });
     fs.writeFileSync(FALLBACK_DB_PATH, JSON.stringify(initialStore, null, 2));
@@ -396,10 +426,14 @@ export function loadStore(): any {
   
   try {
     const raw = fs.readFileSync(FALLBACK_DB_PATH, 'utf8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.purchase_tasks) {
+      parsed.purchase_tasks = [];
+    }
+    return parsed;
   } catch (err) {
     console.error('Failed to read fallback DB file:', err);
-    return { users: [], products: [], orders: [], banners: [] };
+    return { users: [], products: [], orders: [], banners: [], settings: [], purchase_tasks: [] };
   }
 }
 

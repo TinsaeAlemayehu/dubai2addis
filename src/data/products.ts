@@ -376,7 +376,7 @@ export const TESTIMONIALS: Testimonial[] = [
     name: 'Mahlet Abera',
     location: 'Hawassa / Adama',
     rating: 5,
-    text: 'This is a game-changer! Sourcing abayas and luxury perfumes from Dubai used to require relatives traveling back and forth. Now I can just select them from Dubai2Addis. Easy payment, fast shipping, and extremely professional support!',
+    text: 'This is a game-changer! Sourcing abayas and luxury perfumes from Dubai used to require relatives traveling back and forth. Now I can just select them from AddisDubai. Easy payment, fast shipping, and extremely professional support!',
     avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80',
     verified: true,
     date: '1 month ago'

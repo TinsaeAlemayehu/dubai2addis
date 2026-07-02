@@ -63,6 +63,18 @@ export const apiClient = {
       method: 'DELETE'
     });
   },
+  async importProducts(data: { supplierUrl: string; supplierName?: string; category?: string; brand?: string }) {
+    return apiFetch('/api/import-products', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async bulkCreateProducts(products: any[]) {
+    return apiFetch('/api/products/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ products })
+    });
+  },
 
   // Orders
   async getOrders() {
@@ -100,6 +112,9 @@ export const apiClient = {
   async getUsers() {
     return apiFetch('/api/users');
   },
+  async getCustomers() {
+    return apiFetch('/api/customers');
+  },
   async updateUserRole(id: number, role: string) {
     return apiFetch(`/api/users/${id}/role`, {
       method: 'PUT',
@@ -118,9 +133,49 @@ export const apiClient = {
     });
   },
 
+  // Settings
+  async getSettings() {
+    return apiFetch('/api/settings');
+  },
+  async updateSettings(data: { siteName?: string; logoUrl?: string; whatsappNumber?: string; currency?: string; deliveryFee?: string; supportEmail?: string }) {
+    return apiFetch('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
   // Analytics
   async getAnalytics() {
     return apiFetch('/api/analytics');
+  },
+
+  // Purchase Queue
+  async getPurchaseTasks() {
+    return apiFetch('/api/purchase-tasks');
+  },
+  async createPurchaseTask(data: { orderId: number; productSku: string; productName: string; quantity: number; selectedSize?: string; selectedColor?: string; supplierId?: string; supplierPriceAED?: number; notes?: string }) {
+    return apiFetch('/api/purchase-tasks', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async updatePurchaseTaskStatus(id: number, data: { purchaseStatus?: string; notes?: string; supplierId?: string; supplierPriceAED?: number }) {
+    return apiFetch(`/api/purchase-tasks/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  async bulkUpdatePurchaseTasksStatus(ids: number[], purchaseStatus: string) {
+    return apiFetch('/api/purchase-tasks/bulk-status', {
+      method: 'PUT',
+      body: JSON.stringify({ ids, purchaseStatus })
+    });
+  },
+  async bulkDeletePurchaseTasks(ids: number[]) {
+    return apiFetch('/api/purchase-tasks/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids })
+    });
   },
 
   // Auth Operations

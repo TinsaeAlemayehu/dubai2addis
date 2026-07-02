@@ -46,6 +46,43 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  // Global store configuration settings
+  const [storeSettings, setStoreSettings] = useState({
+    siteName: 'AddisDubai',
+    websiteName: 'AddisDubai', // Backward compatibility fallback
+    logoUrl: '',
+    whatsappNumber: '+971552734073',
+    currency: 'ETB',
+    deliveryFee: '200',
+    supportEmail: 'info@addisdubai.com',
+    contactEmail: 'info@addisdubai.com' // Backward compatibility fallback
+  });
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const data = await apiClient.getSettings();
+        if (data) {
+          setStoreSettings({
+            siteName: data.siteName || 'AddisDubai',
+            websiteName: data.siteName || 'AddisDubai',
+            logoUrl: data.logoUrl || '',
+            whatsappNumber: data.whatsappNumber || '+971552734073',
+            currency: data.currency || 'ETB',
+            deliveryFee: data.deliveryFee || '200',
+            supportEmail: data.supportEmail || 'info@addisdubai.com',
+            contactEmail: data.supportEmail || 'info@addisdubai.com'
+          });
+          // Update page title / meta elements
+          document.title = (data.siteName || 'AddisDubai') + " - Premium Fashion Sourcing";
+        }
+      } catch (err) {
+        console.error('Failed to load settings from DB:', err);
+      }
+    }
+    loadSettings();
+  }, []);
+
   // Authentication & Panel toggles
   const [user, setUser] = useState<any>(() => {
     try {
@@ -76,7 +113,7 @@ export default function App() {
   // Persistence states
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('dubai2addis_cart');
+      const saved = localStorage.getItem('addisdubai_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -85,7 +122,7 @@ export default function App() {
 
   const [wishlist, setWishlist] = useState<Product[]>(() => {
     try {
-      const saved = localStorage.getItem('dubai2addis_wishlist');
+      const saved = localStorage.getItem('addisdubai_wishlist');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -260,11 +297,11 @@ export default function App() {
 
   // Sync state to local standard cache
   useEffect(() => {
-    localStorage.setItem('dubai2addis_cart', JSON.stringify(cartItems));
+    localStorage.setItem('addisdubai_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
   useEffect(() => {
-    localStorage.setItem('dubai2addis_wishlist', JSON.stringify(wishlist));
+    localStorage.setItem('addisdubai_wishlist', JSON.stringify(wishlist));
     // Push update to DB if signed in
     if (user) {
       apiClient.updateWishlist(wishlist.map(w => w.id.toString())).catch(() => {});
@@ -356,19 +393,21 @@ export default function App() {
       ? (product as any).priceETB
       : Math.round(product.priceAED * EXCHANGE_RATE_ETB);
 
-    const textMessage = `Hello Dubai2Addis Fashion,\n\n` +
+    const textMessage = `Hello ${storeSettings.websiteName} Fashion,\n\n` +
       `I would like to order:\n\n` +
-      `1. ${product.name} (Product ID: ${product.id}) - ${convertedETB.toLocaleString()} ETB\n\n` +
-      `Total: ${convertedETB.toLocaleString()} ETB\n\n` +
+      `1. ${product.name} (Product ID: ${product.id}) - ${convertedETB.toLocaleString()} ${storeSettings.currency}\n\n` +
+      `Total: ${convertedETB.toLocaleString()} ${storeSettings.currency}\n\n` +
       `Please send deposit payment instructions.`;
 
     const encoded = encodeURIComponent(textMessage);
-    window.open(`https://wa.me/971552734073?text=${encoded}`, '_blank', 'referrer');
+    const cleanedPhone = storeSettings.whatsappNumber.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${cleanedPhone}?text=${encoded}`, '_blank', 'referrer');
   };
 
   // 4. Computation - Filtered Catalog list based on states
   const filteredProducts = useMemo(() => {
-    let result = [...productsList];
+    // Only display Published products to the end-users / customers
+    let result = productsList.filter(p => !p.status || p.status === 'Published');
 
     // Category filter
     if (selectedCategory) {
@@ -440,6 +479,7 @@ export default function App() {
       {/* Signout support logic */}
       {/* Dynamic Header Component */}
       <Header
+        storeSettings={storeSettings}
         cartCount={cartItems.reduce((acc, x) => acc + x.quantity, 0)}
         wishlistCount={wishlist.length}
         onOpenCart={() => { setIsBagOpen(true); }}
@@ -689,7 +729,7 @@ export default function App() {
       <SocialAndReviews />
 
       {/* Dynamic footer credentials block */}
-      <Footer onSelectCategory={handleSelectCategory} />
+      <Footer storeSettings={storeSettings} onSelectCategory={handleSelectCategory} />
 
       {/* --- FLOATING DIALS & DIALOG OVERLAYS --- */}
 
@@ -706,6 +746,7 @@ export default function App() {
 
       {/* 2. Slide out Shopping Cart Drawer Overlay */}
       <CartDrawer
+        storeSettings={storeSettings}
         isOpen={isBagOpen}
         onClose={() => setIsBagOpen(false)}
         cartItems={cartItems}
@@ -758,7 +799,7 @@ export default function App() {
               <div className="flex flex-col items-center text-center mb-6">
                 {/* Logo */}
                 <span className="font-sans text-xl md:text-2xl font-black tracking-tighter leading-none text-black uppercase">
-                  Dubai2Addis
+                  AddisDubai
                 </span>
                 <span className="text-[9px] tracking-[0.3em] text-[#C9A84C] uppercase font-black mt-1 block">
                   Fashion House
@@ -769,7 +810,7 @@ export default function App() {
                   {isRegistering ? 'Create your account' : 'Welcome back'}
                 </h3>
                 <p className="text-sm text-neutral-500 mt-1">
-                  {isRegistering ? 'Join Dubai2Addis Fashion House' : 'Sign in to your account'}
+                  {isRegistering ? 'Join AddisDubai Fashion House' : 'Sign in to your account'}
                 </p>
               </div>
 
@@ -992,7 +1033,7 @@ export default function App() {
         )}
         
         <a
-          href="https://wa.me/971552734073?text=Hello%20Dubai2Addis!%20I%20have%20questions%20about%20custom%20importing%20fashion%20items%20from%20Dubai."
+          href={`https://wa.me/${storeSettings.whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${storeSettings.siteName}! I have questions about custom importing fashion items.`)}`}
           target="_blank"
           referrerPolicy="no-referrer"
           className="relative h-14 w-14 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center text-[#ffffff] shadow-2xl transition-transform hover:scale-115 active:scale-90 group border border-emerald-400"

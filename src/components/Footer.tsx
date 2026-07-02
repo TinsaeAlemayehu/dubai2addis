@@ -16,12 +16,14 @@ import {
   ShieldCheck, 
   Globe
 } from 'lucide-react';
+import { StoreSettings } from '../types';
 
 interface FooterProps {
+  storeSettings?: StoreSettings;
   onSelectCategory: (categoryId: string) => void;
 }
 
-export default function Footer({ onSelectCategory }: FooterProps) {
+export default function Footer({ storeSettings, onSelectCategory }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -34,7 +36,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
         <div className="space-y-4">
           <div className="flex flex-col">
             <span className="font-sans text-xl font-black tracking-tighter text-white">
-              DUBAI2ADDIS
+              {storeSettings?.siteName || 'ADDISDUBAI'}
             </span>
             <span className="text-[9px] tracking-[0.3em] text-[#D4AF37] uppercase font-extrabold mt-1 block">
               FASHION HOUSE
@@ -163,7 +165,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
             </li>
             <li className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-emerald-500" />
-              <span>WhatsApp Chat: <a href="https://wa.me/971552734073" target="_blank" referrerPolicy="no-referrer" className="hover:text-white transition-colors">+971 55 273 4073</a></span>
+              <span>WhatsApp Chat: <a href={`https://wa.me/${(storeSettings?.whatsappNumber || '971552734073').replace(/[^0-9]/g, '')}`} target="_blank" referrerPolicy="no-referrer" className="hover:text-white transition-colors">{storeSettings?.whatsappNumber || '+971 55 273 4073'}</a></span>
             </li>
             <li className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-gold-500" />
@@ -171,7 +173,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-gold-500" />
-              <span>support@dubai2addis.com</span>
+              <span>{storeSettings?.supportEmail || 'support@addisdubai.com'}</span>
             </li>
           </ul>
         </div>
@@ -200,7 +202,7 @@ export default function Footer({ onSelectCategory }: FooterProps) {
       {/* 3. Credits & copyright */}
       <div className="bg-neutral-950 py-4 text-center text-neutral-600 text-[10px] select-none">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6 flex flex-col sm:flex-row justify-between items-center gap-2">
-          <p>© {currentYear} Dubai2Addis Fashion Brand Sourcing Platform. Sourced and delivered with confidence.</p>
+          <p>© {currentYear} AddisDubai Fashion Brand Sourcing Platform. Sourced and delivered with confidence.</p>
           <div className="flex items-center gap-4">
             <a href="#footer" className="hover:text-neutral-400">Privacy Policy</a>
             <span>•</span>

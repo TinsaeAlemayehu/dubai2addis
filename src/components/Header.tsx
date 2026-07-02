@@ -17,10 +17,11 @@ import {
   BadgeHelp,
   ArrowRight
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, StoreSettings } from '../types';
 import { User, LogOut, LayoutDashboard } from 'lucide-react';
 
 interface HeaderProps {
+  storeSettings?: StoreSettings;
   cartCount: number;
   wishlistCount: number;
   onOpenCart: () => void;
@@ -35,6 +36,7 @@ interface HeaderProps {
 }
 
 export default function Header({
+  storeSettings,
   cartCount,
   wishlistCount,
   onOpenCart,
@@ -53,9 +55,9 @@ export default function Header({
 
   const announcements = [
     '✨ FREE COURIER FROM DUBAI TO ETHIOPIA ON ORDERS ABOVE 36,500 ETB! ✨',
-    '📞 24/7 WHATSAPP SUPPORT: +971 55 273 4073 📞',
+    `📞 24/7 WHATSAPP SUPPORT: ${storeSettings?.whatsappNumber || '+971 55 273 4073'} 📞`,
     '📞 CALL SUPPORT (ETHIOPIA): +251 909 319 951 📞',
-    '🔥 NEW ARRIVALS DIRECT FROM DUBAI EXCLUSIVE MALLS 🔥'
+    `🔥 NEW ARRIVALS DIRECT FROM ${(storeSettings?.siteName || 'ADDISDUBAI').toUpperCase()} EXCLUSIVE MALLS 🔥`
   ];
 
   useEffect(() => {
@@ -165,9 +167,9 @@ export default function Header({
               onClick={() => onSelectCategory('all')} 
               className="cursor-pointer select-none shrink-0"
             >
-              <div className="flex flex-col">
+              <div className="flex flex-col font-sans uppercase">
                 <span className="font-sans text-lg md:text-2xl font-black tracking-tighter leading-none text-black">
-                  DUBAI2ADDIS
+                  {storeSettings?.siteName || 'ADDISDUBAI'}
                 </span>
                 <span className="text-[8px] md:text-[9px] tracking-[0.3em] text-gold-500 uppercase font-black mt-0.5 block">
                   FASHION HOUSE
