@@ -2,16 +2,57 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { db } from './src/db/index.ts';
-import { products, orders, users, banners, settings, purchaseTasks } from './src/db/schema.ts';
+import { products, orders, users, banners, settings, purchaseTasks, importJobs, importJobItems, importTemplates, suppliers, brands, departments, categories, subcategories } from './src/db/schema.ts';
 import { eq, and, or, asc, desc, like, sql } from 'drizzle-orm';
 import { requireAuth, requireAdmin, requireSuperAdmin, AuthRequest } from './src/middleware/auth.ts';
 import { seedDatabase } from './src/db/seed.ts';
 import { adminAuth } from './src/lib/firebase-admin.ts';
 import firebaseConfig from './firebase-applet-config.json'; // Direct static import
 import crypto from 'crypto';
+import { calculateSellingPrice, DEFAULT_PRICING_SETTINGS } from './src/lib/pricingEngine.ts';
 
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function validateSupplierUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Block loopback, local, internal hostnames
+    if (
+      hostname === 'localhost' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal') ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0'
+    ) {
+      return false;
+    }
+
+    // Block private IPv4 space
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Regex);
+    if (match) {
+      const parts = match.slice(1).map(Number);
+      if (parts.some(p => p < 0 || p > 255)) return false;
+      const [p1, p2] = parts;
+      if (p1 === 127) return false;
+      if (p1 === 10) return false;
+      if (p1 === 169 && p2 === 254) return false;
+      if (p1 === 172 && p2 >= 16 && p2 <= 31) return false;
+      if (p1 === 192 && p2 === 168) return false;
+      if (p1 === 0) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_local_secret_dub2addis_2026_!!';
@@ -303,6 +344,13 @@ async function startServer() {
           currency: 'ETB',
           deliveryFee: '200',
           supportEmail: 'info@addisdubai.com',
+          exchangeRates: { AED: 31.0, USD: 115.0 },
+          shippingPercentage: 20.0,
+          handlingPercentage: 5.0,
+          riskBufferPercentage: 3.0,
+          profitPercentage: 15.0,
+          fixedFeeETB: 0,
+          roundingRule: 'None',
           updatedAt: new Date()
         };
         try {
@@ -317,9 +365,64 @@ async function startServer() {
     }
   });
 
+  // Helper for catalog-wide product pricing recalculation
+  async function recalculateProductsPricing(mode: 'all' | 'draft' | 'selected' | 'future', productIds?: number[]) {
+    if (mode === 'future') {
+      return 0;
+    }
+
+    const records = await db.select().from(settings).where(eq(settings.id, 1));
+    const currentSettings = records[0] || DEFAULT_PRICING_SETTINGS;
+
+    const allProds = await db.select().from(products);
+    let toUpdate = allProds;
+
+    if (mode === 'draft') {
+      toUpdate = allProds.filter(p => p.status === 'Draft' || p.status?.toLowerCase() === 'draft');
+    } else if (mode === 'selected' && productIds && productIds.length > 0) {
+      const idSet = new Set(productIds);
+      toUpdate = allProds.filter(p => idSet.has(p.id));
+    }
+
+    toUpdate = toUpdate.filter(p => p.supplierPrice !== null && p.supplierPrice !== undefined && Number(p.supplierPrice) > 0);
+
+    let updatedCount = 0;
+    await db.transaction(async (tx: any) => {
+      for (const p of toUpdate) {
+        const sPrice = Number(p.supplierPrice);
+        const sCurrency = p.supplierCurrency || 'AED';
+
+        const breakdown = calculateSellingPrice(sPrice, sCurrency, currentSettings);
+
+        await tx.update(products)
+          .set({
+            priceETB: breakdown.roundedTotalETB,
+            exchangeRateUsed: breakdown.exchangeRateUsed,
+            shippingPercentageUsed: breakdown.shippingPercentageUsed,
+            handlingPercentageUsed: breakdown.handlingPercentageUsed,
+            riskBufferPercentageUsed: breakdown.riskBufferPercentageUsed,
+            profitPercentageUsed: breakdown.profitPercentageUsed,
+            fixedFeeUsed: breakdown.fixedFeeUsed,
+            calculatedSellingPriceETB: breakdown.roundedTotalETB,
+            calculatedAt: new Date(),
+          })
+          .where(eq(products.id, p.id));
+
+        updatedCount++;
+      }
+    });
+
+    return updatedCount;
+  }
+
   app.put('/api/settings', requireAdmin, async (req: AuthRequest, res) => {
     try {
-      const { siteName, logoUrl, whatsappNumber, currency, deliveryFee, supportEmail } = req.body;
+      const {
+        siteName, logoUrl, whatsappNumber, currency, deliveryFee, supportEmail,
+        exchangeRates, shippingPercentage, handlingPercentage, riskBufferPercentage,
+        profitPercentage, fixedFeeETB, roundingRule, recalculateMode, selectedProductIds
+      } = req.body;
+
       const records = await db.select().from(settings).where(eq(settings.id, 1));
       let updated;
       if (records.length === 0) {
@@ -331,6 +434,13 @@ async function startServer() {
           currency: currency || 'ETB',
           deliveryFee: deliveryFee || '200',
           supportEmail: supportEmail || 'info@addisdubai.com',
+          exchangeRates: exchangeRates || { AED: 31.0, USD: 115.0 },
+          shippingPercentage: shippingPercentage !== undefined ? parseFloat(shippingPercentage) : 20.0,
+          handlingPercentage: handlingPercentage !== undefined ? parseFloat(handlingPercentage) : 5.0,
+          riskBufferPercentage: riskBufferPercentage !== undefined ? parseFloat(riskBufferPercentage) : 3.0,
+          profitPercentage: profitPercentage !== undefined ? parseFloat(profitPercentage) : 15.0,
+          fixedFeeETB: fixedFeeETB !== undefined ? parseInt(fixedFeeETB) : 0,
+          roundingRule: roundingRule || 'None',
           updatedAt: new Date()
         }).returning();
       } else {
@@ -342,15 +452,48 @@ async function startServer() {
             currency: currency !== undefined ? currency : undefined,
             deliveryFee: deliveryFee !== undefined ? deliveryFee : undefined,
             supportEmail: supportEmail !== undefined ? supportEmail : undefined,
+            exchangeRates: exchangeRates !== undefined ? exchangeRates : undefined,
+            shippingPercentage: shippingPercentage !== undefined ? parseFloat(shippingPercentage) : undefined,
+            handlingPercentage: handlingPercentage !== undefined ? parseFloat(handlingPercentage) : undefined,
+            riskBufferPercentage: riskBufferPercentage !== undefined ? parseFloat(riskBufferPercentage) : undefined,
+            profitPercentage: profitPercentage !== undefined ? parseFloat(profitPercentage) : undefined,
+            fixedFeeETB: fixedFeeETB !== undefined ? parseInt(fixedFeeETB) : undefined,
+            roundingRule: roundingRule !== undefined ? roundingRule : undefined,
             updatedAt: new Date()
           })
           .where(eq(settings.id, 1))
           .returning();
       }
-      res.json(updated[0]);
+
+      // If recalculate mode is specified, execute the recalculation
+      let recalculatedCount = 0;
+      if (recalculateMode && ['all', 'draft', 'selected'].includes(recalculateMode)) {
+        recalculatedCount = await recalculateProductsPricing(recalculateMode, selectedProductIds);
+      }
+
+      res.json({
+        settings: updated[0],
+        recalculatedCount
+      });
     } catch (error: any) {
       console.error('Error updating settings:', error);
       res.status(500).json({ error: error.message || 'Failed to update settings' });
+    }
+  });
+
+  // Dedicated Bulk Recalculate Endpoint
+  app.post('/api/pricing/recalculate', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { mode, productIds } = req.body;
+      if (!mode || !['all', 'draft', 'selected'].includes(mode)) {
+        return res.status(400).json({ error: 'Valid mode ("all", "draft", or "selected") is required.' });
+      }
+
+      const count = await recalculateProductsPricing(mode, productIds);
+      res.json({ success: true, recalculatedCount: count });
+    } catch (error: any) {
+      console.error('Failed to trigger pricing recalculation:', error);
+      res.status(500).json({ error: 'Failed to recalculate pricing: ' + error.message });
     }
   });
 
@@ -473,7 +616,10 @@ async function startServer() {
   // 1. Products API
   app.get('/api/products', async (req, res) => {
     try {
-      const { category, subcategory, search, sort, isFeatured, isNewArrival, page = '1', limit = '100' } = req.query;
+      const {
+        category, subcategory, search, sort, isFeatured, isNewArrival, page = '1', limit = '100',
+        supplierId, brandId, departmentId, categoryId, subcategoryId, priceMin, priceMax, status
+      } = req.query;
       
       let conditions = [];
 
@@ -483,6 +629,38 @@ async function startServer() {
 
       if (subcategory) {
         conditions.push(eq(products.subcategory, subcategory as string));
+      }
+
+      if (supplierId) {
+        conditions.push(eq(products.supplierId, parseInt(supplierId as string)));
+      }
+
+      if (brandId) {
+        conditions.push(eq(products.brandId, parseInt(brandId as string)));
+      }
+
+      if (departmentId) {
+        conditions.push(eq(products.departmentId, parseInt(departmentId as string)));
+      }
+
+      if (categoryId) {
+        conditions.push(eq(products.categoryId, parseInt(categoryId as string)));
+      }
+
+      if (subcategoryId) {
+        conditions.push(eq(products.subcategoryId, parseInt(subcategoryId as string)));
+      }
+
+      if (status) {
+        conditions.push(eq(products.status, status as string));
+      }
+
+      if (priceMin) {
+        conditions.push(sql`${products.priceETB} >= ${parseInt(priceMin as string)}`);
+      }
+
+      if (priceMax) {
+        conditions.push(sql`${products.priceETB} <= ${parseInt(priceMax as string)}`);
       }
 
       if (isFeatured === 'true') {
@@ -544,15 +722,35 @@ async function startServer() {
   // Admin/Staff - Add Product
   app.post('/api/products', requireAdmin, async (req: AuthRequest, res) => {
     try {
-      const {
+      let {
         sku, name, description, category, subcategory, brand,
         priceETB, originalPriceETB, sizes, colors, images,
-        isFeatured, isNewArrival, quantityAvailable, lowStockAlertThreshold, status
+        isFeatured, isNewArrival, quantityAvailable, lowStockAlertThreshold, status,
+        supplierId, brandId, departmentId, categoryId, subcategoryId
       } = req.body;
+
+      if (categoryId) {
+        const catRows = await db.select().from(categories).where(eq(categories.id, parseInt(categoryId)));
+        if (catRows.length > 0) category = catRows[0].name;
+      }
+      if (subcategoryId) {
+        const subRows = await db.select().from(subcategories).where(eq(subcategories.id, parseInt(subcategoryId)));
+        if (subRows.length > 0) subcategory = subRows[0].name;
+      }
+      if (brandId) {
+        const brandRows = await db.select().from(brands).where(eq(brands.id, parseInt(brandId)));
+        if (brandRows.length > 0) brand = brandRows[0].name;
+      }
 
       if (!sku || !name || !category || !priceETB) {
         return res.status(400).json({ error: 'SKU, Name, Category and Price are required' });
       }
+
+      const {
+        supplierPrice, supplierCurrency, exchangeRateUsed,
+        shippingPercentageUsed, handlingPercentageUsed, riskBufferPercentageUsed,
+        profitPercentageUsed, fixedFeeUsed, calculatedSellingPriceETB, calculatedAt
+      } = req.body;
 
       const newProd = await db.insert(products)
         .values({
@@ -562,6 +760,11 @@ async function startServer() {
           category,
           subcategory,
           brand,
+          supplierId: supplierId ? parseInt(supplierId) : null,
+          brandId: brandId ? parseInt(brandId) : null,
+          departmentId: departmentId ? parseInt(departmentId) : null,
+          categoryId: categoryId ? parseInt(categoryId) : null,
+          subcategoryId: subcategoryId ? parseInt(subcategoryId) : null,
           priceETB: parseInt(priceETB),
           originalPriceETB: originalPriceETB ? parseInt(originalPriceETB) : null,
           sizes: sizes || [],
@@ -573,6 +776,16 @@ async function startServer() {
           quantityReserved: 0,
           lowStockAlertThreshold: lowStockAlertThreshold !== undefined ? parseInt(lowStockAlertThreshold) : 3,
           status: status || 'Published',
+          supplierPrice: supplierPrice !== undefined ? parseFloat(supplierPrice) : null,
+          supplierCurrency: supplierCurrency || null,
+          exchangeRateUsed: exchangeRateUsed !== undefined ? parseFloat(exchangeRateUsed) : null,
+          shippingPercentageUsed: shippingPercentageUsed !== undefined ? parseFloat(shippingPercentageUsed) : null,
+          handlingPercentageUsed: handlingPercentageUsed !== undefined ? parseFloat(handlingPercentageUsed) : null,
+          riskBufferPercentageUsed: riskBufferPercentageUsed !== undefined ? parseFloat(riskBufferPercentageUsed) : null,
+          profitPercentageUsed: profitPercentageUsed !== undefined ? parseFloat(profitPercentageUsed) : null,
+          fixedFeeUsed: fixedFeeUsed !== undefined ? parseInt(fixedFeeUsed) : null,
+          calculatedSellingPriceETB: calculatedSellingPriceETB !== undefined ? parseInt(calculatedSellingPriceETB) : null,
+          calculatedAt: calculatedAt ? new Date(calculatedAt) : null,
         })
         .returning();
 
@@ -589,11 +802,28 @@ async function startServer() {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
 
-      const {
+      let {
         sku, name, description, category, subcategory, brand,
         priceETB, originalPriceETB, sizes, colors, images,
-        isFeatured, isNewArrival, quantityAvailable, lowStockAlertThreshold, status
+        isFeatured, isNewArrival, quantityAvailable, lowStockAlertThreshold, status,
+        supplierId, brandId, departmentId, categoryId, subcategoryId,
+        supplierPrice, supplierCurrency, exchangeRateUsed,
+        shippingPercentageUsed, handlingPercentageUsed, riskBufferPercentageUsed,
+        profitPercentageUsed, fixedFeeUsed, calculatedSellingPriceETB, calculatedAt
       } = req.body;
+
+      if (categoryId) {
+        const catRows = await db.select().from(categories).where(eq(categories.id, parseInt(categoryId)));
+        if (catRows.length > 0) category = catRows[0].name;
+      }
+      if (subcategoryId) {
+        const subRows = await db.select().from(subcategories).where(eq(subcategories.id, parseInt(subcategoryId)));
+        if (subRows.length > 0) subcategory = subRows[0].name;
+      }
+      if (brandId) {
+        const brandRows = await db.select().from(brands).where(eq(brands.id, parseInt(brandId)));
+        if (brandRows.length > 0) brand = brandRows[0].name;
+      }
 
       const updated = await db.update(products)
         .set({
@@ -603,6 +833,11 @@ async function startServer() {
           category,
           subcategory,
           brand,
+          supplierId: supplierId !== undefined ? (supplierId ? parseInt(supplierId) : null) : undefined,
+          brandId: brandId !== undefined ? (brandId ? parseInt(brandId) : null) : undefined,
+          departmentId: departmentId !== undefined ? (departmentId ? parseInt(departmentId) : null) : undefined,
+          categoryId: categoryId !== undefined ? (categoryId ? parseInt(categoryId) : null) : undefined,
+          subcategoryId: subcategoryId !== undefined ? (subcategoryId ? parseInt(subcategoryId) : null) : undefined,
           priceETB: priceETB !== undefined ? parseInt(priceETB) : undefined,
           originalPriceETB: originalPriceETB !== undefined ? (originalPriceETB ? parseInt(originalPriceETB) : null) : undefined,
           sizes: sizes || undefined,
@@ -613,6 +848,16 @@ async function startServer() {
           quantityAvailable: quantityAvailable !== undefined ? parseInt(quantityAvailable) : undefined,
           lowStockAlertThreshold: lowStockAlertThreshold !== undefined ? parseInt(lowStockAlertThreshold) : undefined,
           status: status !== undefined ? status : undefined,
+          supplierPrice: supplierPrice !== undefined ? (supplierPrice ? parseFloat(supplierPrice) : null) : undefined,
+          supplierCurrency: supplierCurrency !== undefined ? supplierCurrency : undefined,
+          exchangeRateUsed: exchangeRateUsed !== undefined ? (exchangeRateUsed ? parseFloat(exchangeRateUsed) : null) : undefined,
+          shippingPercentageUsed: shippingPercentageUsed !== undefined ? (shippingPercentageUsed ? parseFloat(shippingPercentageUsed) : null) : undefined,
+          handlingPercentageUsed: handlingPercentageUsed !== undefined ? (handlingPercentageUsed ? parseFloat(handlingPercentageUsed) : null) : undefined,
+          riskBufferPercentageUsed: riskBufferPercentageUsed !== undefined ? (riskBufferPercentageUsed ? parseFloat(riskBufferPercentageUsed) : null) : undefined,
+          profitPercentageUsed: profitPercentageUsed !== undefined ? (profitPercentageUsed ? parseFloat(profitPercentageUsed) : null) : undefined,
+          fixedFeeUsed: fixedFeeUsed !== undefined ? (fixedFeeUsed ? parseInt(fixedFeeUsed) : null) : undefined,
+          calculatedSellingPriceETB: calculatedSellingPriceETB !== undefined ? (calculatedSellingPriceETB ? parseInt(calculatedSellingPriceETB) : null) : undefined,
+          calculatedAt: calculatedAt !== undefined ? (calculatedAt ? new Date(calculatedAt) : null) : undefined,
         })
         .where(eq(products.id, id))
         .returning();
@@ -879,6 +1124,11 @@ async function startServer() {
       const { supplierUrl, supplierName, category, brand } = req.body;
       if (!supplierUrl) return res.status(400).json({ error: 'Supplier URL is required' });
 
+      // Enforce SSRF validation on the URL
+      if (!validateSupplierUrl(supplierUrl)) {
+        return res.status(400).json({ error: 'Insecure or invalid Supplier URL. Private, loopback, and local IP/host routes are blocked.' });
+      }
+
       // Determine a friendly name based on supplier name/URL domain
       let urlDomain = 'Supplier';
       try {
@@ -1031,18 +1281,68 @@ async function startServer() {
         return res.status(400).json({ error: 'Products array is required' });
       }
 
-      const createdList = [];
-      for (const p of productsToCreate) {
-        const created = await db.insert(products)
-          .values({
+      const result = await db.transaction(async (tx: any) => {
+        const insertPayloads = [];
+
+        for (const p of productsToCreate) {
+          // Resolve string names from IDs for full backwards compatibility
+          let categoryName = p.category || '';
+          let subcategoryName = p.subcategory || '';
+          let brandName = p.brand || '';
+
+          const sId = p.supplierId ? parseInt(p.supplierId) : null;
+          const bId = p.brandId ? parseInt(p.brandId) : null;
+          const dId = p.departmentId ? parseInt(p.departmentId) : null;
+          const cId = p.categoryId ? parseInt(p.categoryId) : null;
+          const scId = p.subcategoryId ? parseInt(p.subcategoryId) : null;
+
+          if (cId) {
+            const catRows = await tx.select().from(categories).where(eq(categories.id, cId));
+            if (catRows.length > 0) categoryName = catRows[0].name;
+          }
+          if (scId) {
+            const subRows = await tx.select().from(subcategories).where(eq(subcategories.id, scId));
+            if (subRows.length > 0) subcategoryName = subRows[0].name;
+          }
+          if (bId) {
+            const brandRows = await tx.select().from(brands).where(eq(brands.id, bId));
+            if (brandRows.length > 0) brandName = brandRows[0].name;
+          }
+
+          if (!p.name) {
+            throw new Error(`Product validation failed: 'name' is required.`);
+          }
+          if (!categoryName) {
+            throw new Error(`Product validation failed: 'category' is required for product '${p.name}'.`);
+          }
+          if (p.priceETB === undefined || p.priceETB === null || p.priceETB === '') {
+            throw new Error(`Product validation failed: 'priceETB' is required for product '${p.name}'.`);
+          }
+
+          const parsedPrice = parseInt(p.priceETB);
+          if (isNaN(parsedPrice) || parsedPrice <= 0) {
+            throw new Error(`Product validation failed: Price must be a positive number for product '${p.name}'.`);
+          }
+
+          const parsedOriginalPrice = p.originalPriceETB ? parseInt(p.originalPriceETB) : null;
+          if (parsedOriginalPrice !== null && (isNaN(parsedOriginalPrice) || parsedOriginalPrice <= 0)) {
+            throw new Error(`Product validation failed: Original Price must be a positive number for product '${p.name}'.`);
+          }
+
+          insertPayloads.push({
             sku: p.sku || 'SKU-' + Math.floor(1000 + Math.random() * 9000),
             name: p.name,
             description: p.description || '',
-            category: p.category,
-            subcategory: p.subcategory || '',
-            brand: p.brand || '',
-            priceETB: parseInt(p.priceETB),
-            originalPriceETB: p.originalPriceETB ? parseInt(p.originalPriceETB) : null,
+            category: categoryName,
+            subcategory: subcategoryName,
+            brand: brandName,
+            supplierId: sId,
+            brandId: bId,
+            departmentId: dId,
+            categoryId: cId,
+            subcategoryId: scId,
+            priceETB: parsedPrice,
+            originalPriceETB: parsedOriginalPrice,
             sizes: p.sizes || [],
             colors: p.colors || [],
             images: p.images || [],
@@ -1051,16 +1351,191 @@ async function startServer() {
             quantityAvailable: p.quantityAvailable !== undefined ? parseInt(p.quantityAvailable) : 10,
             quantityReserved: 0,
             lowStockAlertThreshold: p.lowStockAlertThreshold !== undefined ? parseInt(p.lowStockAlertThreshold) : 3,
-            status: p.status || 'Published',
-          })
-          .returning();
-        createdList.push(created[0]);
-      }
+            status: p.status || 'Draft', // Enforce 'Draft' as default
+            supplierPrice: p.supplierPrice !== undefined ? parseFloat(p.supplierPrice) : null,
+            supplierCurrency: p.supplierCurrency || null,
+            exchangeRateUsed: p.exchangeRateUsed !== undefined ? parseFloat(p.exchangeRateUsed) : null,
+            shippingPercentageUsed: p.shippingPercentageUsed !== undefined ? parseFloat(p.shippingPercentageUsed) : null,
+            handlingPercentageUsed: p.handlingPercentageUsed !== undefined ? parseFloat(p.handlingPercentageUsed) : null,
+            riskBufferPercentageUsed: p.riskBufferPercentageUsed !== undefined ? parseFloat(p.riskBufferPercentageUsed) : null,
+            profitPercentageUsed: p.profitPercentageUsed !== undefined ? parseFloat(p.profitPercentageUsed) : null,
+            fixedFeeUsed: p.fixedFeeUsed !== undefined ? parseInt(p.fixedFeeUsed) : null,
+            calculatedSellingPriceETB: p.calculatedSellingPriceETB !== undefined ? parseInt(p.calculatedSellingPriceETB) : null,
+            calculatedAt: p.calculatedAt ? new Date(p.calculatedAt) : null,
+          });
+        }
 
-      res.status(201).json({ message: `Successfully published ${createdList.length} products`, products: createdList });
+        // Perform single batch insert using Drizzle ORM inside transaction
+        const created = await tx.insert(products)
+          .values(insertPayloads)
+          .returning();
+        
+        return created;
+      });
+
+      res.status(201).json({ message: `Successfully created ${result.length} products`, products: result });
     } catch (error: any) {
       console.error('Bulk products creation failed:', error);
       res.status(500).json({ error: 'Bulk publish failed: ' + error.message });
+    }
+  });
+
+  // Universal Product Import Jobs API - Get Import History
+  app.get('/api/import-jobs', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const history = await db.select()
+        .from(importJobs)
+        .orderBy(desc(importJobs.id));
+      res.json(history);
+    } catch (error: any) {
+      console.error('Failed to fetch import history:', error);
+      res.status(500).json({ error: 'Failed to fetch import history' });
+    }
+  });
+
+  // Get specific import job items
+  app.get('/api/import-jobs/:id/items', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) return res.status(400).json({ error: 'Invalid Job ID' });
+
+      const items = await db.select()
+        .from(importJobItems)
+        .where(eq(importJobItems.jobId, jobId))
+        .orderBy(asc(importJobItems.id));
+      res.json(items);
+    } catch (error: any) {
+      console.error('Failed to fetch import job items:', error);
+      res.status(500).json({ error: 'Failed to fetch import job items' });
+    }
+  });
+
+  // Create an import job record (History log)
+  app.post('/api/import-jobs', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const {
+        filename,
+        supplier,
+        status,
+        duration,
+        totalRows,
+        importedCount,
+        updatedCount,
+        skippedCount,
+        failedCount,
+        duplicateCount,
+        errorLog,
+        items
+      } = req.body;
+
+      if (!filename) return res.status(400).json({ error: 'Filename is required' });
+
+      const result = await db.transaction(async (tx: any) => {
+        // Create the import job summary row
+        const newJob = await tx.insert(importJobs)
+          .values({
+            filename,
+            supplier: supplier || 'Generic',
+            status: status || 'Completed',
+            duration: duration || 0,
+            totalRows: totalRows || 0,
+            importedCount: importedCount || 0,
+            updatedCount: updatedCount || 0,
+            skippedCount: skippedCount || 0,
+            failedCount: failedCount || 0,
+            duplicateCount: duplicateCount || 0,
+            errorLog: errorLog || '',
+          })
+          .returning();
+
+        const jobId = newJob[0].id;
+
+        // Create job item details if provided
+        if (Array.isArray(items) && items.length > 0) {
+          const itemPayloads = items.map((item: any) => ({
+            jobId,
+            sku: item.sku || '',
+            name: item.name || '',
+            status: item.status || 'Imported',
+            errorMessage: item.errorMessage || null,
+          }));
+
+          // Insert items in batch
+          await tx.insert(importJobItems).values(itemPayloads);
+        }
+
+        return newJob[0];
+      });
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error('Failed to create import job history:', error);
+      res.status(500).json({ error: 'Failed to log import job: ' + error.message });
+    }
+  });
+
+  // Delete an import job history item
+  app.delete('/api/import-jobs/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) return res.status(400).json({ error: 'Invalid Job ID' });
+
+      await db.delete(importJobs).where(eq(importJobs.id, jobId));
+      res.json({ message: 'Import history log deleted successfully' });
+    } catch (error: any) {
+      console.error('Failed to delete import job:', error);
+      res.status(500).json({ error: 'Failed to delete import history log' });
+    }
+  });
+
+  // Import templates mapping configurations
+  app.get('/api/import-templates', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const templates = await db.select().from(importTemplates).orderBy(desc(importTemplates.id));
+      res.json(templates);
+    } catch (error: any) {
+      console.error('Failed to fetch import templates:', error);
+      res.status(500).json({ error: 'Failed to fetch templates' });
+    }
+  });
+
+  app.post('/api/import-templates', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { name, mapping } = req.body;
+      if (!name || !mapping) return res.status(400).json({ error: 'Name and mapping are required' });
+
+      // Save template with conflict resolution
+      const existing = await db.select().from(importTemplates).where(eq(importTemplates.name, name));
+      
+      let result;
+      if (existing.length > 0) {
+        result = await db.update(importTemplates)
+          .set({ mapping })
+          .where(eq(importTemplates.name, name))
+          .returning();
+      } else {
+        result = await db.insert(importTemplates)
+          .values({ name, mapping })
+          .returning();
+      }
+
+      res.status(201).json(result[0]);
+    } catch (error: any) {
+      console.error('Failed to save import template:', error);
+      res.status(500).json({ error: 'Failed to save template: ' + error.message });
+    }
+  });
+
+  app.delete('/api/import-templates/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid template ID' });
+
+      await db.delete(importTemplates).where(eq(importTemplates.id, id));
+      res.json({ message: 'Template deleted successfully' });
+    } catch (error: any) {
+      console.error('Failed to delete template:', error);
+      res.status(500).json({ error: 'Failed to delete template' });
     }
   });
 
@@ -1174,6 +1649,258 @@ async function startServer() {
     } catch (error: any) {
       console.error('Failed to load analytics:', error);
       res.status(500).json({ error: 'Failed to access financial reports' });
+    }
+  });
+
+
+  // --- CATALOG CLASSIFICATION SYSTEM APIS ---
+
+  // Suppliers APIs
+  app.get('/api/suppliers', async (req, res) => {
+    try {
+      const all = await db.select().from(suppliers).orderBy(asc(suppliers.name));
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch suppliers' });
+    }
+  });
+
+  app.post('/api/suppliers', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+      const created = await db.insert(suppliers).values({ name, isArchived: false }).returning();
+      res.status(201).json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to create supplier' });
+    }
+  });
+
+  app.put('/api/suppliers/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, isArchived } = req.body;
+      const updated = await db.update(suppliers)
+        .set({
+          name,
+          isArchived: isArchived !== undefined ? !!isArchived : undefined
+        })
+        .where(eq(suppliers.id, id))
+        .returning();
+      if (updated.length === 0) return res.status(404).json({ error: 'Supplier not found' });
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update supplier' });
+    }
+  });
+
+  // Brands APIs
+  app.get('/api/brands', async (req, res) => {
+    try {
+      const all = await db.select().from(brands).orderBy(asc(brands.name));
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch brands' });
+    }
+  });
+
+  app.post('/api/brands', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+      const created = await db.insert(brands).values({ name, isArchived: false }).returning();
+      res.status(201).json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to create brand' });
+    }
+  });
+
+  app.put('/api/brands/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, isArchived } = req.body;
+      const updated = await db.update(brands)
+        .set({
+          name,
+          isArchived: isArchived !== undefined ? !!isArchived : undefined
+        })
+        .where(eq(brands.id, id))
+        .returning();
+      if (updated.length === 0) return res.status(404).json({ error: 'Brand not found' });
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update brand' });
+    }
+  });
+
+  // Departments APIs
+  app.get('/api/departments', async (req, res) => {
+    try {
+      const all = await db.select().from(departments).orderBy(asc(departments.name));
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch departments' });
+    }
+  });
+
+  app.post('/api/departments', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+      const created = await db.insert(departments).values({ name, isArchived: false }).returning();
+      res.status(201).json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to create department' });
+    }
+  });
+
+  app.put('/api/departments/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, isArchived } = req.body;
+      const updated = await db.update(departments)
+        .set({
+          name,
+          isArchived: isArchived !== undefined ? !!isArchived : undefined
+        })
+        .where(eq(departments.id, id))
+        .returning();
+      if (updated.length === 0) return res.status(404).json({ error: 'Department not found' });
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update department' });
+    }
+  });
+
+  // Categories APIs
+  app.get('/api/categories', async (req, res) => {
+    try {
+      const all = await db.select().from(categories).orderBy(asc(categories.name));
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+  });
+
+  app.post('/api/categories', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+      const created = await db.insert(categories).values({ name, isArchived: false }).returning();
+      res.status(201).json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to create category' });
+    }
+  });
+
+  app.put('/api/categories/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, isArchived } = req.body;
+      const updated = await db.update(categories)
+        .set({
+          name,
+          isArchived: isArchived !== undefined ? !!isArchived : undefined
+        })
+        .where(eq(categories.id, id))
+        .returning();
+      if (updated.length === 0) return res.status(404).json({ error: 'Category not found' });
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update category' });
+    }
+  });
+
+  // Subcategories APIs
+  app.get('/api/subcategories', async (req, res) => {
+    try {
+      const { categoryId } = req.query;
+      let query = db.select().from(subcategories);
+      if (categoryId) {
+        query = query.where(eq(subcategories.categoryId, parseInt(categoryId as string))) as any;
+      }
+      const all = await query.orderBy(asc(subcategories.name));
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch subcategories' });
+    }
+  });
+
+  app.post('/api/subcategories', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { name, categoryId } = req.body;
+      if (!name || !categoryId) return res.status(400).json({ error: 'Name and Category ID are required' });
+      const created = await db.insert(subcategories).values({
+        name,
+        categoryId: parseInt(categoryId),
+        isArchived: false
+      }).returning();
+      res.status(201).json(created[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to create subcategory' });
+    }
+  });
+
+  app.put('/api/subcategories/:id', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, categoryId, isArchived } = req.body;
+      const updated = await db.update(subcategories)
+        .set({
+          name,
+          categoryId: categoryId ? parseInt(categoryId) : undefined,
+          isArchived: isArchived !== undefined ? !!isArchived : undefined
+        })
+        .where(eq(subcategories.id, id))
+        .returning();
+      if (updated.length === 0) return res.status(404).json({ error: 'Subcategory not found' });
+      res.json(updated[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update subcategory' });
+    }
+  });
+
+  // Supplier Presets / Import Templates APIs
+  app.get('/api/import-templates/supplier/:supplier', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const supplierName = req.params.supplier;
+      const templateName = `supplier_preset_${supplierName.toLowerCase().replace(/\s+/g, '_')}`;
+      const found = await db.select().from(importTemplates).where(eq(importTemplates.name, templateName));
+      if (found.length === 0) {
+        return res.json({ preset: null });
+      }
+      res.json({ preset: found[0].mapping });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch supplier preset' });
+    }
+  });
+
+  app.post('/api/import-templates/supplier/:supplier', requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const supplierName = req.params.supplier;
+      const templateName = `supplier_preset_${supplierName.toLowerCase().replace(/\s+/g, '_')}`;
+      const { preset } = req.body; // should be { departmentId, brandId, categoryId, subcategoryId }
+      if (!preset) return res.status(400).json({ error: 'Preset object is required' });
+
+      // Check if template exists
+      const found = await db.select().from(importTemplates).where(eq(importTemplates.name, templateName));
+      if (found.length > 0) {
+        const updated = await db.update(importTemplates)
+          .set({ mapping: preset })
+          .where(eq(importTemplates.name, templateName))
+          .returning();
+        res.json({ success: true, preset: updated[0].mapping });
+      } else {
+        const created = await db.insert(importTemplates)
+          .values({
+            name: templateName,
+            mapping: preset
+          })
+          .returning();
+        res.json({ success: true, preset: created[0].mapping });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to save supplier preset' });
     }
   });
 

@@ -81,7 +81,7 @@ pool.query('SELECT 1')
         quantity_available INTEGER DEFAULT 10,
         quantity_reserved INTEGER DEFAULT 0,
         low_stock_threshold INTEGER DEFAULT 3,
-        status TEXT DEFAULT 'Published',
+        status TEXT DEFAULT 'Draft',
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -136,16 +136,133 @@ pool.query('SELECT 1')
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS import_jobs (
+        id SERIAL PRIMARY KEY,
+        filename TEXT NOT NULL,
+        supplier TEXT DEFAULT 'Generic',
+        status TEXT NOT NULL DEFAULT 'Completed',
+        duration INTEGER DEFAULT 0,
+        total_rows INTEGER DEFAULT 0,
+        imported_count INTEGER DEFAULT 0,
+        updated_count INTEGER DEFAULT 0,
+        skipped_count INTEGER DEFAULT 0,
+        failed_count INTEGER DEFAULT 0,
+        duplicate_count INTEGER DEFAULT 0,
+        error_log TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS import_job_items (
+        id SERIAL PRIMARY KEY,
+        job_id INTEGER NOT NULL REFERENCES import_jobs(id) ON DELETE CASCADE,
+        sku TEXT,
+        name TEXT,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS import_templates (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        mapping JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        is_archived BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS brands (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        is_archived BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS departments (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        is_archived BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS categories (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        is_archived BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS subcategories (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        is_archived BOOLEAN DEFAULT false NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
     `;
 
     try {
       await pool.query(createTablesDdl);
-      // Run safe migration to add status column if it doesn't exist
-      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Published';");
+      // Run safe migrations to add status column and set default to 'Draft'
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Draft';");
+      await pool.query("ALTER TABLE products ALTER COLUMN status SET DEFAULT 'Draft';");
+
+      // Add classification columns to products
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE SET NULL;");
+      
+      // Add Pricing Engine columns to products
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_price REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_currency TEXT DEFAULT 'AED';");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS exchange_rate_used REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_percentage_used REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS handling_percentage_used REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS risk_buffer_percentage_used REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS profit_percentage_used REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS fixed_fee_used REAL;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS calculated_selling_price_etb INTEGER;");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS calculated_at TIMESTAMP;");
+
+      // Add Pricing Engine columns to settings
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS exchange_rates JSONB DEFAULT '{\"AED\": 31.0, \"USD\": 115.0}'::jsonb;");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS shipping_percentage REAL DEFAULT 20.0;");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS handling_percentage REAL DEFAULT 5.0;");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS risk_buffer_percentage REAL DEFAULT 3.0;");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS profit_percentage REAL DEFAULT 15.0;");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS fixed_fee_etb INTEGER DEFAULT 0;");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS rounding_rule TEXT DEFAULT 'None';");
+      
+      // Ensure database indexes are created
+      await pool.query("CREATE INDEX IF NOT EXISTS products_sku_idx ON products (sku);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_category_idx ON products (category);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_brand_idx ON products (brand);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_status_idx ON products (status);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_supplier_id_idx ON products (supplier_id);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_brand_id_idx ON products (brand_id);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_department_id_idx ON products (department_id);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_category_id_idx ON products (category_id);");
+      await pool.query("CREATE INDEX IF NOT EXISTS products_subcategory_id_idx ON products (subcategory_id);");
+
       // Seed default settings row if not exists
       await pool.query(`
-        INSERT INTO settings (id, site_name, logo_url, whatsapp_number, currency, delivery_fee, support_email)
-        VALUES (1, 'AddisDubai', '', '+971552734073', 'ETB', '200', 'info@addisdubai.com')
+        INSERT INTO settings (
+          id, site_name, logo_url, whatsapp_number, currency, delivery_fee, support_email,
+          exchange_rates, shipping_percentage, handling_percentage, risk_buffer_percentage,
+          profit_percentage, fixed_fee_etb, rounding_rule
+        )
+        VALUES (
+          1, 'AddisDubai', '', '+971552734073', 'ETB', '200', 'info@addisdubai.com',
+          '{"AED": 31.0, "USD": 115.0}'::jsonb, 20.0, 5.0, 3.0, 15.0, 0, 'None'
+        )
         ON CONFLICT (id) DO NOTHING;
       `);
       console.log('Database tables verified/created successfully.');

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '../lib/api.ts';
+import UniversalImportEngine from './UniversalImportEngine';
+import ClassificationManager from './ClassificationManager';
 import { 
+  Sliders,
   TrendingUp, 
   ShoppingBag, 
   Users, 
@@ -45,12 +48,19 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ user, onClose, onRefreshProducts }: AdminDashboardProps) {
-  // Tabs: dashboard, products, import, orders, customers, settings, purchaseQueue
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'import' | 'orders' | 'customers' | 'settings' | 'purchaseQueue'>('dashboard');
+  // Tabs: dashboard, products, import, orders, customers, settings, purchaseQueue, classifications
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'import' | 'orders' | 'customers' | 'settings' | 'purchaseQueue' | 'classifications'>('dashboard');
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Database classifications list for forms
+  const [dbSuppliers, setDbSuppliers] = useState<any[]>([]);
+  const [dbBrands, setDbBrands] = useState<any[]>([]);
+  const [dbDepartments, setDbDepartments] = useState<any[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [dbSubcategories, setDbSubcategories] = useState<any[]>([]);
 
   // Sourcing data states
   const [products, setProducts] = useState<any[]>([]);
@@ -94,7 +104,12 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
     isNewArrival: false,
     quantityAvailable: '10',
     lowStockAlertThreshold: '3',
-    status: 'Published'
+    status: 'Published',
+    supplierId: '',
+    brandId: '',
+    departmentId: '',
+    categoryId: '',
+    subcategoryId: ''
   });
 
   // Importer Page States
@@ -287,6 +302,30 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
     fetchSettings();
   }, []);
 
+  // Fetch classifications on tab changes or dashboard load
+  const fetchClassifications = async () => {
+    try {
+      const [sups, brs, depts, cats, subs] = await Promise.all([
+        apiClient.getSuppliers(),
+        apiClient.getBrands(),
+        apiClient.getDepartments(),
+        apiClient.getCategories(),
+        apiClient.getSubcategories()
+      ]);
+      setDbSuppliers(sups || []);
+      setDbBrands(brs || []);
+      setDbDepartments(depts || []);
+      setDbCategories(cats || []);
+      setDbSubcategories(subs || []);
+    } catch (err) {
+      console.error('Failed to load taxonomy classifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchClassifications();
+  }, [activeTab]);
+
   // Fetch data on active tab changes
   useEffect(() => {
     loadData();
@@ -426,13 +465,23 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
     e.preventDefault();
     setLoading(true);
     try {
+      // Resolve string names of selected classifications for legacy schema support
+      const selectedCat = dbCategories.find(c => c.id === parseInt(prodForm.categoryId));
+      const categoryStr = selectedCat ? selectedCat.name.toLowerCase() : prodForm.category;
+
+      const selectedSub = dbSubcategories.find(s => s.id === parseInt(prodForm.subcategoryId));
+      const subcategoryStr = selectedSub ? selectedSub.name : prodForm.subcategory;
+
+      const selectedBr = dbBrands.find(b => b.id === parseInt(prodForm.brandId));
+      const brandStr = selectedBr ? selectedBr.name : prodForm.brand;
+
       const payload = {
         sku: prodForm.sku,
         name: prodForm.name,
         description: prodForm.description,
-        category: prodForm.category,
-        subcategory: prodForm.subcategory,
-        brand: prodForm.brand,
+        category: categoryStr,
+        subcategory: subcategoryStr,
+        brand: brandStr,
         priceETB: parseInt(prodForm.priceETB),
         originalPriceETB: prodForm.originalPriceETB ? parseInt(prodForm.originalPriceETB) : null,
         sizes: prodForm.sizes.split(',').map(s => s.trim()).filter(Boolean),
@@ -442,7 +491,12 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
         isNewArrival: !!prodForm.isNewArrival,
         quantityAvailable: parseInt(prodForm.quantityAvailable),
         lowStockAlertThreshold: parseInt(prodForm.lowStockAlertThreshold),
-        status: prodForm.status
+        status: prodForm.status,
+        supplierId: prodForm.supplierId ? parseInt(prodForm.supplierId) : null,
+        brandId: prodForm.brandId ? parseInt(prodForm.brandId) : null,
+        departmentId: prodForm.departmentId ? parseInt(prodForm.departmentId) : null,
+        categoryId: prodForm.categoryId ? parseInt(prodForm.categoryId) : null,
+        subcategoryId: prodForm.subcategoryId ? parseInt(prodForm.subcategoryId) : null
       };
 
       if (editingProduct) {
@@ -723,7 +777,12 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
         isNewArrival: !!product.isNewArrival,
         quantityAvailable: product.quantityAvailable?.toString() || '10',
         lowStockAlertThreshold: product.lowStockAlertThreshold?.toString() || '3',
-        status: product.status || 'Published'
+        status: product.status || 'Published',
+        supplierId: product.supplierId?.toString() || '',
+        brandId: product.brandId?.toString() || '',
+        departmentId: product.departmentId?.toString() || '',
+        categoryId: product.categoryId?.toString() || '',
+        subcategoryId: product.subcategoryId?.toString() || ''
       });
     } else {
       setEditingProduct(null);
@@ -746,7 +805,12 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
         isNewArrival: true,
         quantityAvailable: '10',
         lowStockAlertThreshold: '3',
-        status: 'Published'
+        status: 'Published',
+        supplierId: '',
+        brandId: '',
+        departmentId: '',
+        categoryId: '',
+        subcategoryId: ''
       });
     }
     setIsEditing(true);
@@ -862,6 +926,14 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
               </button>
 
               <button 
+                onClick={() => { setActiveTab('classifications'); setIsEditing(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'classifications' ? 'bg-neutral-900 text-white shadow-md' : 'text-neutral-600 hover:bg-neutral-100 hover:text-black'}`}
+              >
+                <Sliders className="h-4 w-4 shrink-0" />
+                <span>Classifications</span>
+              </button>
+
+              <button 
                 onClick={() => { setActiveTab('settings'); setIsEditing(false); }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'settings' ? 'bg-neutral-900 text-white shadow-md' : 'text-neutral-600 hover:bg-neutral-100 hover:text-black'}`}
               >
@@ -886,7 +958,7 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
             
             {/* Mobile Touch navigation layout */}
             <div className="flex md:hidden gap-1 mb-4 overflow-x-auto pb-2 border-b border-neutral-200 shrink-0">
-              {(['dashboard', 'products', 'import', 'orders', 'customers', 'purchaseQueue', 'settings'] as const).map((tab) => (
+              {(['dashboard', 'products', 'import', 'orders', 'customers', 'purchaseQueue', 'classifications', 'settings'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => { setActiveTab(tab); setIsEditing(false); }}
@@ -896,7 +968,7 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
                       : 'bg-white text-neutral-600 border-neutral-200 hover:bg-neutral-50'
                   }`}
                 >
-                  {tab === 'import' ? 'Import' : tab === 'purchaseQueue' ? 'Sourcing Queue' : tab}
+                  {tab === 'import' ? 'Import' : tab === 'purchaseQueue' ? 'Sourcing Queue' : tab === 'classifications' ? 'Classifications' : tab}
                 </button>
               ))}
             </div>
@@ -1156,9 +1228,7 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
                               value={prodForm.sku}
                               onChange={e => setProdForm({...prodForm, sku: e.target.value})}
                             />
-                          </div>
-
-                          <div className="space-y-1 block">
+                                                   <div className="space-y-1 block">
                             <label className="font-bold text-neutral-700 uppercase text-[10px]">Product Name *</label>
                             <input 
                               type="text" 
@@ -1169,32 +1239,115 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
                             />
                           </div>
 
-                          <div className="space-y-1 block">
-                            <label className="font-bold text-neutral-700 uppercase text-[10px]">Brand / Supplier</label>
-                            <input 
-                              type="text" 
-                              className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black" 
-                              value={prodForm.brand}
-                              onChange={e => setProdForm({...prodForm, brand: e.target.value})}
-                            />
-                          </div>
+                          <div className="space-y-1.5 block md:col-span-2 bg-neutral-50/70 p-4 rounded-xl border border-neutral-200/50 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <span className="col-span-1 md:col-span-2 text-[10px] font-black text-black tracking-wider uppercase mb-1 block">Dynamic Product Classifications & Taxonomy</span>
+                            
+                            {/* Supplier Selector */}
+                            <div className="space-y-1 block">
+                              <label className="font-extrabold text-neutral-600 uppercase text-[9.5px]">Supplier Name</label>
+                              <select 
+                                className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black text-xs font-semibold"
+                                value={prodForm.supplierId}
+                                onChange={e => setProdForm({...prodForm, supplierId: e.target.value})}
+                              >
+                                <option value="">-- No Supplier bound --</option>
+                                {dbSuppliers.map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                              </select>
+                            </div>
 
-                          <div className="space-y-1 block">
-                            <label className="font-bold text-neutral-700 uppercase text-[10px]">Category *</label>
-                            <select 
-                              className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black"
-                              value={prodForm.category}
-                              onChange={e => setProdForm({...prodForm, category: e.target.value})}
-                            >
-                              <option value="dresses">Dresses</option>
-                              <option value="abayas">Abayas</option>
-                              <option value="handbags">Handbags</option>
-                              <option value="shoes">Shoes</option>
-                              <option value="beauty">Beauty</option>
-                              <option value="jewelry">Jewelry</option>
-                              <option value="watches">Watches</option>
-                            </select>
-                          </div>
+                            {/* Brand Selector */}
+                            <div className="space-y-1 block">
+                              <label className="font-extrabold text-neutral-600 uppercase text-[9.5px]">Brand Name</label>
+                              <select 
+                                className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black text-xs font-semibold"
+                                value={prodForm.brandId}
+                                onChange={e => {
+                                  const bid = e.target.value;
+                                  const br = dbBrands.find(b => b.id === parseInt(bid));
+                                  setProdForm({
+                                    ...prodForm, 
+                                    brandId: bid,
+                                    brand: br ? br.name : prodForm.brand
+                                  });
+                                }}
+                              >
+                                <option value="">-- No Brand bound --</option>
+                                {dbBrands.map(b => (
+                                  <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Department Selector */}
+                            <div className="space-y-1 block">
+                              <label className="font-extrabold text-neutral-600 uppercase text-[9.5px]">Department *</label>
+                              <select 
+                                className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black text-xs font-semibold"
+                                required
+                                value={prodForm.departmentId}
+                                onChange={e => setProdForm({...prodForm, departmentId: e.target.value})}
+                              >
+                                <option value="">-- Choose Department --</option>
+                                {dbDepartments.map(d => (
+                                  <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Category Selector */}
+                            <div className="space-y-1 block">
+                              <label className="font-extrabold text-neutral-600 uppercase text-[9.5px]">Main Category *</label>
+                              <select 
+                                className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black text-xs font-semibold"
+                                required
+                                value={prodForm.categoryId}
+                                onChange={e => {
+                                  const cid = e.target.value;
+                                  const cat = dbCategories.find(c => c.id === parseInt(cid));
+                                  setProdForm({
+                                    ...prodForm, 
+                                    categoryId: cid,
+                                    category: cat ? cat.name.toLowerCase() : prodForm.category,
+                                    subcategoryId: '' // Reset subcategory when main category changes
+                                  });
+                                }}
+                              >
+                                <option value="">-- Choose Main Category --</option>
+                                {dbCategories.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Subcategory Selector */}
+                            <div className="space-y-1 block md:col-span-2">
+                              <label className="font-extrabold text-neutral-600 uppercase text-[9.5px]">Subcategory</label>
+                              <select 
+                                className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black text-xs font-semibold"
+                                value={prodForm.subcategoryId}
+                                onChange={e => {
+                                  const sid = e.target.value;
+                                  const sub = dbSubcategories.find(s => s.id === parseInt(sid));
+                                  setProdForm({
+                                    ...prodForm, 
+                                    subcategoryId: sid,
+                                    subcategory: sub ? sub.name : prodForm.subcategory
+                                  });
+                                }}
+                                disabled={!prodForm.categoryId}
+                              >
+                                <option value="">-- No Subcategory or Choose --</option>
+                                {dbSubcategories
+                                  .filter(s => s.categoryId === parseInt(prodForm.categoryId))
+                                  .map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                  ))
+                                }
+                              </select>
+                            </div>
+                          </div>   </div>
 
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1 block">
@@ -1582,229 +1735,12 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
                   </div>
                 )}
 
-                {/* 3. IMPORT PRODUCTS STAGING WORKSPACE */}
+                {/* 3. UNIVERSAL PRODUCT IMPORT ENGINE */}
                 {activeTab === 'import' && (
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    
-                    {/* Supplier URL Import form card */}
-                    <div className="bg-white p-5 rounded-xl border border-neutral-200/70 shadow-sm xl:col-span-1 space-y-4 h-fit">
-                      <span className="text-[11px] font-black text-black tracking-widest uppercase block border-b border-neutral-100 pb-2 flex items-center gap-2">
-                        <DownloadCloud className="h-4.5 w-4.5 text-amber-500" />
-                        <span>Sourcing Port / Crawler</span>
-                      </span>
-
-                      <form onSubmit={handleImportTrigger} className="space-y-4 text-xs font-sans">
-                        <div className="space-y-1 block">
-                          <label className="font-bold text-neutral-700 uppercase text-[10px]">Supplier URL *</label>
-                          <input 
-                            type="url" 
-                            required 
-                            placeholder="e.g. https://www.shein.com/catalog/dress-102.html" 
-                            className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black font-semibold" 
-                            value={importUrl} 
-                            onChange={e => setImportUrl(e.target.value)} 
-                          />
-                        </div>
-
-                        <div className="space-y-1 block">
-                          <label className="font-bold text-neutral-700 uppercase text-[10px]">Supplier Portal Name (Optional)</label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. SHEIN Fashion, Amazon Dubai" 
-                            className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black" 
-                            value={importSupplier} 
-                            onChange={e => setImportSupplier(e.target.value)} 
-                          />
-                        </div>
-
-                        <div className="space-y-1 block">
-                          <label className="font-bold text-neutral-700 uppercase text-[10px]">Target Category *</label>
-                          <select 
-                            className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black"
-                            value={importCategory}
-                            onChange={e => setImportCategory(e.target.value)}
-                          >
-                            <option value="dresses">Dresses</option>
-                            <option value="abayas">Abayas</option>
-                            <option value="handbags">Handbags</option>
-                            <option value="shoes">Shoes</option>
-                            <option value="beauty">Beauty</option>
-                            <option value="jewelry">Jewelry</option>
-                            <option value="watches">Watches</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1 block">
-                          <label className="font-bold text-neutral-700 uppercase text-[10px]">Custom Brand Label (Optional)</label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. SHEIN Luxe" 
-                            className="w-full bg-white px-3 py-2 border border-neutral-250 rounded-lg focus:outline-none focus:border-black" 
-                            value={importBrand} 
-                            onChange={e => setImportBrand(e.target.value)} 
-                          />
-                        </div>
-
-                        <button 
-                          type="submit" 
-                          disabled={importing || !importUrl}
-                          className="w-full bg-neutral-950 hover:bg-amber-500 hover:text-black font-sans font-black uppercase text-[10px] tracking-wider py-3 rounded-lg text-white transition-all shadow flex items-center justify-center gap-2"
-                        >
-                          {importing ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin text-white" />
-                              <span>Sourcing supplier specs...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4" />
-                              <span>Import Supplier Catalog</span>
-                            </>
-                          )}
-                        </button>
-                      </form>
-
-                      {/* Log / Step progress bar */}
-                      {(importing || importProgress > 0) && (
-                        <div className="bg-neutral-50 p-4 border border-neutral-200/50 rounded-xl space-y-3">
-                          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-neutral-700">
-                            <span>{importStep}</span>
-                            <span className="font-mono">{importProgress}%</span>
-                          </div>
-                          
-                          <div className="h-2 w-full bg-neutral-200 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-amber-500 transition-all duration-300" 
-                              style={{ width: `${importProgress}%` }}
-                            />
-                          </div>
-
-                          <div className="bg-neutral-950 text-emerald-400 p-2.5 rounded font-mono text-[8px] space-y-1 max-h-[140px] overflow-y-auto leading-relaxed">
-                            {importLogs.map((log, lIdx) => (
-                              <div key={lIdx}>{log}</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* Imported buffer preview area */}
-                    <div className="bg-white p-5 rounded-xl border border-neutral-200/70 shadow-sm xl:col-span-2 space-y-4">
-                      <div className="flex items-center justify-between border-b border-neutral-100 pb-2 select-none shrink-0">
-                        <span className="text-[11px] font-black text-black tracking-widest uppercase block flex items-center gap-2">
-                          <Sparkles className="h-4.5 w-4.5 text-amber-500" />
-                          <span>Imported Staging Buffer ({importedStagingList.length} items)</span>
-                        </span>
-                      </div>
-
-                      {importedStagingList.length === 0 ? (
-                        <div className="h-80 border-2 border-dashed border-neutral-200 rounded-xl flex flex-col items-center justify-center text-center p-6 text-neutral-400 select-none">
-                          <DownloadCloud className="h-12 w-12 text-neutral-300 mb-3" />
-                          <h4 className="text-sm font-bold text-neutral-700">Staging Area Empty</h4>
-                          <p className="text-xs text-neutral-400 max-w-sm mt-1 leading-normal">
-                            Crawler imports are temporarily stored here. You can edit specs, review pricing, and bulk publish selected products.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          
-                          {/* Bulk actions for staged products */}
-                          <div className="bg-neutral-900 text-white p-3 rounded-xl flex items-center justify-between gap-4 shadow-lg select-none">
-                            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-300">
-                              <span className="bg-white/10 text-white px-2 py-0.5 rounded font-bold font-mono">
-                                {selectedImportedIds.length}
-                              </span>
-                              <span>items selected</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleBulkPublishImported('Published')}
-                                className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black px-3.5 py-1.5 text-[9px] uppercase rounded-md tracking-wider shadow"
-                              >
-                                Bulk Publish Live
-                              </button>
-                              <button
-                                onClick={() => handleBulkPublishImported('Draft')}
-                                className="bg-white/15 hover:bg-white/25 text-white font-black px-3.5 py-1.5 text-[9px] uppercase rounded-md tracking-wider border border-white/10"
-                              >
-                                Stage as Draft
-                              </button>
-                              <button
-                                onClick={() => setImportedStagingList([])}
-                                className="text-rose-400 hover:text-rose-300 text-[9px] font-black uppercase px-2 py-1"
-                              >
-                                Clear Staging
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Staging product table */}
-                          <div className="overflow-x-auto rounded-xl border border-neutral-200/50">
-                            <table className="w-full text-left text-xs font-sans whitespace-nowrap">
-                              <thead>
-                                <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-400 font-extrabold uppercase text-[9.5px] select-none">
-                                  <th className="py-2.5 px-3 w-4 text-center">
-                                    <input 
-                                      type="checkbox" 
-                                      className="rounded border-neutral-300 text-neutral-950 h-3.5 w-3.5 cursor-pointer"
-                                      checked={selectedImportedIds.length === importedStagingList.length}
-                                      onChange={handleImportedSelectAll}
-                                    />
-                                  </th>
-                                  <th className="py-2.5 px-3">Product details</th>
-                                  <th className="py-2.5 px-3">SKU</th>
-                                  <th className="py-2.5 px-3">Category</th>
-                                  <th className="py-2.5 px-3">Brand</th>
-                                  <th className="py-2.5 px-3 font-mono">Staged Price</th>
-                                  <th className="py-2.5 px-4 text-right">Action</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-neutral-100">
-                                {importedStagingList.map((stg) => (
-                                  <tr key={stg.sku} className="hover:bg-neutral-50/50 transition-colors">
-                                    <td className="py-2.5 px-3 text-center">
-                                      <input 
-                                        type="checkbox" 
-                                        className="rounded border-neutral-300 text-neutral-950 h-3.5 w-3.5 cursor-pointer"
-                                        checked={selectedImportedIds.includes(stg.sku)}
-                                        onChange={(e) => handleImportedSelect(stg.sku, e.target.checked)}
-                                      />
-                                    </td>
-                                    <td className="py-2.5 px-3">
-                                      <div className="flex items-center gap-3">
-                                        <img src={stg.images?.[0] || 'https://placehold.co/40'} className="h-8 w-8 object-cover border rounded-md shrink-0" />
-                                        <div>
-                                          <h5 className="font-extrabold text-neutral-900 truncate max-w-[200px]">{stg.name}</h5>
-                                          <p className="text-[8.5px] text-neutral-400 font-semibold uppercase">{stg.subcategory || 'imported'}</p>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="py-2.5 px-3 font-mono text-[9px] font-bold text-neutral-400">{stg.sku}</td>
-                                    <td className="py-2.5 px-3 text-neutral-600 capitalize font-bold text-[10px]">{stg.category}</td>
-                                    <td className="py-2.5 px-3 text-neutral-500 font-semibold">{stg.brand}</td>
-                                    <td className="py-2.5 px-3 font-mono font-black text-emerald-800 text-[10.5px]">{stg.priceETB.toLocaleString()} {settingsForm.currency}</td>
-                                    <td className="py-2.5 px-4 text-right">
-                                      <button 
-                                        onClick={() => setProductPreview(stg)}
-                                        className="text-amber-600 hover:text-black font-extrabold uppercase text-[9px] bg-amber-50 hover:bg-amber-100 transition-all px-2.5 py-1.5 rounded-md"
-                                      >
-                                        Preview specs
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-
-                        </div>
-                      )}
-
-                    </div>
-
-                  </div>
+                  <UniversalImportEngine 
+                    currency={settingsForm.currency} 
+                    onImportCompleted={onRefreshProducts} 
+                  />
                 )}
 
                 {/* 4. ORDERS DIRECTORY VIEW */}
@@ -2473,6 +2409,10 @@ export default function AdminDashboard({ user, onClose, onRefreshProducts }: Adm
 
                     </form>
                   </div>
+                )}
+
+                {activeTab === 'classifications' && (
+                  <ClassificationManager />
                 )}
               </>
             )}

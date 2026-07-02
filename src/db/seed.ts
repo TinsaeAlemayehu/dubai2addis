@@ -1,5 +1,5 @@
 import { db } from './index.ts';
-import { products, banners } from './schema.ts';
+import { products, banners, suppliers, brands, departments, categories, subcategories } from './schema.ts';
 import { sql } from 'drizzle-orm';
 
 // Convert AED to ETB using the established exchange rate of 36.5
@@ -249,10 +249,141 @@ const initialBanners = [
 
 export async function seedDatabase() {
   try {
+    // 1. Seed Suppliers
+    const existingSuppliers = await db.select().from(suppliers);
+    if (existingSuppliers.length === 0) {
+      console.log('Seeding default suppliers...');
+      await db.insert(suppliers).values([
+        { id: 1, name: 'Shein' },
+        { id: 2, name: 'Temu' },
+        { id: 3, name: 'Amazon' },
+        { id: 4, name: 'AliExpress' },
+        { id: 5, name: 'Noon' },
+        { id: 6, name: 'Custom Supplier' }
+      ]);
+    }
+
+    // 2. Seed Brands
+    const existingBrands = await db.select().from(brands);
+    if (existingBrands.length === 0) {
+      console.log('Seeding default brands...');
+      await db.insert(brands).values([
+        { id: 1, name: 'Nike' },
+        { id: 2, name: 'Adidas' },
+        { id: 3, name: 'Puma' },
+        { id: 4, name: 'Gucci' },
+        { id: 5, name: 'Rolex' }
+      ]);
+    }
+
+    // 3. Seed Departments
+    const existingDepts = await db.select().from(departments);
+    if (existingDepts.length === 0) {
+      console.log('Seeding default departments...');
+      await db.insert(departments).values([
+        { id: 1, name: 'Women' },
+        { id: 2, name: 'Men' },
+        { id: 3, name: 'Kids' },
+        { id: 4, name: 'Unisex' }
+      ]);
+    }
+
+    // 4. Seed Categories
+    const existingCats = await db.select().from(categories);
+    if (existingCats.length === 0) {
+      console.log('Seeding default categories...');
+      await db.insert(categories).values([
+        { id: 1, name: 'Dresses' },
+        { id: 2, name: 'Shoes' },
+        { id: 3, name: 'Bags' },
+        { id: 4, name: 'Perfumes' },
+        { id: 5, name: 'Watches' },
+        { id: 6, name: 'Accessories' }
+      ]);
+    }
+
+    // 5. Seed Subcategories
+    const existingSubs = await db.select().from(subcategories);
+    if (existingSubs.length === 0) {
+      console.log('Seeding default subcategories...');
+      await db.insert(subcategories).values([
+        // Shoes
+        { id: 1, name: 'Sneakers', categoryId: 2 },
+        { id: 2, name: 'Running Shoes', categoryId: 2 },
+        { id: 3, name: 'Sandals', categoryId: 2 },
+        { id: 4, name: 'Boots', categoryId: 2 },
+        { id: 5, name: 'Slippers', categoryId: 2 },
+        { id: 6, name: 'Heels', categoryId: 2 },
+        { id: 7, name: 'Formal Shoes', categoryId: 2 },
+        // Dresses
+        { id: 8, name: 'Casual', categoryId: 1 },
+        { id: 9, name: 'Maxi', categoryId: 1 },
+        { id: 10, name: 'Mini', categoryId: 1 },
+        { id: 11, name: 'Party', categoryId: 1 },
+        { id: 12, name: 'Evening', categoryId: 1 },
+        { id: 13, name: 'Abaya', categoryId: 1 },
+        { id: 14, name: 'Wedding', categoryId: 1 },
+        // Bags
+        { id: 15, name: 'Handbags', categoryId: 3 },
+        { id: 16, name: 'Backpacks', categoryId: 3 },
+        { id: 17, name: 'Shoulder Bags', categoryId: 3 },
+        { id: 18, name: 'Crossbody Bags', categoryId: 3 },
+        { id: 19, name: 'Wallets', categoryId: 3 },
+        { id: 20, name: 'Travel Bags', categoryId: 3 },
+        // Watches
+        { id: 21, name: 'Smart Watches', categoryId: 5 },
+        { id: 22, name: 'Sports', categoryId: 5 },
+        { id: 23, name: 'Luxury', categoryId: 5 },
+        { id: 24, name: 'Analog', categoryId: 5 },
+        { id: 25, name: 'Digital', categoryId: 5 },
+        // Accessories
+        { id: 26, name: 'Sunglasses', categoryId: 6 },
+        { id: 27, name: 'Jewelry', categoryId: 6 },
+        { id: 28, name: 'Hats', categoryId: 6 },
+        { id: 29, name: 'Belts', categoryId: 6 },
+        { id: 30, name: 'Scarves', categoryId: 6 }
+      ]);
+    }
+
     const existingProducts = await db.select().from(products);
     if (existingProducts.length === 0) {
       console.log('Seeding products database...');
-      await db.insert(products).values(initialProducts);
+      // Link the initial seed products to the brand, category, department, subcategory IDs
+      const populatedProducts = initialProducts.map((p, idx) => {
+        let supplierId = 6; // Custom
+        let brandId = 3; // Puma
+        if (p.brand?.toLowerCase().includes('shein')) {
+          supplierId = 1;
+          brandId = 4; // Gucci or custom brand mapping
+        } else if (p.brand?.toLowerCase().includes('zara')) {
+          brandId = 4;
+        }
+
+        let categoryId = 1; // Dresses
+        let subcategoryId = 8; // Casual
+        if (p.category === 'shoes') {
+          categoryId = 2;
+          subcategoryId = p.subcategory === 'heels' ? 6 : 1;
+        } else if (p.category === 'handbags') {
+          categoryId = 3;
+          subcategoryId = 15;
+        } else if (p.category === 'watches') {
+          categoryId = 5;
+          subcategoryId = 23;
+        }
+
+        return {
+          ...p,
+          supplierId,
+          brandId,
+          departmentId: 1, // Women
+          categoryId,
+          subcategoryId,
+          // Set status as Published for seeded products
+          status: 'Published'
+        };
+      });
+      await db.insert(products).values(populatedProducts);
       console.log('Products seeded successfully.');
     }
 

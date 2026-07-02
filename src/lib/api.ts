@@ -137,10 +137,32 @@ export const apiClient = {
   async getSettings() {
     return apiFetch('/api/settings');
   },
-  async updateSettings(data: { siteName?: string; logoUrl?: string; whatsappNumber?: string; currency?: string; deliveryFee?: string; supportEmail?: string }) {
+  async updateSettings(data: {
+    siteName?: string;
+    logoUrl?: string;
+    whatsappNumber?: string;
+    currency?: string;
+    deliveryFee?: string;
+    supportEmail?: string;
+    exchangeRates?: Record<string, number>;
+    shippingPercentage?: number;
+    handlingPercentage?: number;
+    riskBufferPercentage?: number;
+    profitPercentage?: number;
+    fixedFeeETB?: number;
+    roundingRule?: string;
+    recalculateMode?: 'future' | 'draft' | 'all' | 'selected';
+    selectedProductIds?: number[];
+  }) {
     return apiFetch('/api/settings', {
       method: 'PUT',
       body: JSON.stringify(data)
+    });
+  },
+  async bulkRecalculatePrices(mode: 'all' | 'draft' | 'selected', productIds?: number[]) {
+    return apiFetch('/api/pricing/recalculate', {
+      method: 'POST',
+      body: JSON.stringify({ mode, productIds })
     });
   },
 
@@ -175,6 +197,131 @@ export const apiClient = {
     return apiFetch('/api/purchase-tasks/bulk-delete', {
       method: 'POST',
       body: JSON.stringify({ ids })
+    });
+  },
+
+  // Universal Import Engine helpers
+  async getImportHistory() {
+    return apiFetch('/api/import-jobs');
+  },
+  async getImportJobItems(jobId: number) {
+    return apiFetch(`/api/import-jobs/${jobId}/items`);
+  },
+  async createImportJob(jobData: any) {
+    return apiFetch('/api/import-jobs', {
+      method: 'POST',
+      body: JSON.stringify(jobData)
+    });
+  },
+  async deleteImportJob(id: number) {
+    return apiFetch(`/api/import-jobs/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  async getImportTemplates() {
+    return apiFetch('/api/import-templates');
+  },
+  async saveImportTemplate(name: string, mapping: any) {
+    return apiFetch('/api/import-templates', {
+      method: 'POST',
+      body: JSON.stringify({ name, mapping })
+    });
+  },
+  async deleteImportTemplate(id: number) {
+    return apiFetch(`/api/import-templates/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Catalog Classification System APIs
+  async getSuppliers() {
+    return apiFetch('/api/suppliers');
+  },
+  async createSupplier(name: string) {
+    return apiFetch('/api/suppliers', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+  },
+  async updateSupplier(id: number, data: { name?: string; isArchived?: boolean }) {
+    return apiFetch(`/api/suppliers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getBrands() {
+    return apiFetch('/api/brands');
+  },
+  async createBrand(name: string) {
+    return apiFetch('/api/brands', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+  },
+  async updateBrand(id: number, data: { name?: string; isArchived?: boolean }) {
+    return apiFetch(`/api/brands/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getDepartments() {
+    return apiFetch('/api/departments');
+  },
+  async createDepartment(name: string) {
+    return apiFetch('/api/departments', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+  },
+  async updateDepartment(id: number, data: { name?: string; isArchived?: boolean }) {
+    return apiFetch(`/api/departments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getCategories() {
+    return apiFetch('/api/categories');
+  },
+  async createCategory(name: string) {
+    return apiFetch('/api/categories', {
+      method: 'POST',
+      body: JSON.stringify({ name })
+    });
+  },
+  async updateCategory(id: number, data: { name?: string; isArchived?: boolean }) {
+    return apiFetch(`/api/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getSubcategories(categoryId?: number) {
+    const query = categoryId ? `?categoryId=${categoryId}` : '';
+    return apiFetch(`/api/subcategories${query}`);
+  },
+  async createSubcategory(name: string, categoryId: number) {
+    return apiFetch('/api/subcategories', {
+      method: 'POST',
+      body: JSON.stringify({ name, categoryId })
+    });
+  },
+  async updateSubcategory(id: number, data: { name?: string; categoryId?: number; isArchived?: boolean }) {
+    return apiFetch(`/api/subcategories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getSupplierPreset(supplier: string) {
+    return apiFetch(`/api/import-templates/supplier/${encodeURIComponent(supplier)}`);
+  },
+  async saveSupplierPreset(supplier: string, preset: any) {
+    return apiFetch(`/api/import-templates/supplier/${encodeURIComponent(supplier)}`, {
+      method: 'POST',
+      body: JSON.stringify({ preset })
     });
   },
 

@@ -1,12 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { users, products, orders, banners, settings, purchaseTasks } from './schema.ts';
+import { users, products, orders, banners, settings, purchaseTasks, importJobs, importJobItems, importTemplates, suppliers, brands, departments, categories, subcategories } from './schema.ts';
 
 const FALLBACK_DB_PATH = path.join(process.cwd(), 'src', 'db', 'fallback_db.json');
 
 // Normalizing column names to row properties
 function getRowValue(row: any, dbColName: string): any {
-  if (dbColName === 'status' && !row[dbColName]) return 'Published';
+  if (dbColName === 'status' && !row[dbColName]) return 'Draft';
   if (dbColName in row) return row[dbColName];
   
   // Convert snake_case to camelCase
@@ -46,7 +46,33 @@ function getRowValue(row: any, dbColName: string): any {
     'selected_color': 'selectedColor',
     'supplier_id': 'supplierId',
     'supplier_price_aed': 'supplierPriceAED',
-    'purchase_status': 'purchaseStatus'
+    'purchase_status': 'purchaseStatus',
+    'total_rows': 'totalRows',
+    'imported_count': 'importedCount',
+    'updated_count': 'updatedCount',
+    'skipped_count': 'skippedCount',
+    'failed_count': 'failedCount',
+    'duplicate_count': 'duplicateCount',
+    'error_log': 'errorLog',
+    'job_id': 'jobId',
+    'error_message': 'errorMessage',
+    'supplier_price': 'supplierPrice',
+    'supplier_currency': 'supplierCurrency',
+    'exchange_rate_used': 'exchangeRateUsed',
+    'shipping_percentage_used': 'shippingPercentageUsed',
+    'handling_percentage_used': 'handlingPercentageUsed',
+    'risk_buffer_percentage_used': 'riskBufferPercentageUsed',
+    'profit_percentage_used': 'profitPercentageUsed',
+    'fixed_fee_used': 'fixedFeeUsed',
+    'calculated_selling_price_etb': 'calculatedSellingPriceETB',
+    'calculated_at': 'calculatedAt',
+    'exchange_rates': 'exchangeRates',
+    'shipping_percentage': 'shippingPercentage',
+    'handling_percentage': 'handlingPercentage',
+    'risk_buffer_percentage': 'riskBufferPercentage',
+    'profit_percentage': 'profitPercentage',
+    'fixed_fee_etb': 'fixedFeeETB',
+    'rounding_rule': 'roundingRule'
   };
   
   const mappedKey = manualMappings[dbColName];
@@ -131,6 +157,14 @@ function getTableName(table: any): string {
   if (table === banners) return 'banners';
   if (table === settings) return 'settings';
   if (table === purchaseTasks) return 'purchase_tasks';
+  if (table === importJobs) return 'import_jobs';
+  if (table === importJobItems) return 'import_job_items';
+  if (table === importTemplates) return 'import_templates';
+  if (table === suppliers) return 'suppliers';
+  if (table === brands) return 'brands';
+  if (table === departments) return 'departments';
+  if (table === categories) return 'categories';
+  if (table === subcategories) return 'subcategories';
   
   if (table && typeof table === 'object') {
     const name = table[Symbol.for('drizzle:Name')] || table.tableName || (table._ && table._.name);
@@ -414,10 +448,78 @@ export function loadStore(): any {
           currency: 'ETB',
           deliveryFee: '200',
           supportEmail: 'info@addisdubai.com',
+          exchangeRates: { AED: 31.0, USD: 115.0 },
+          shippingPercentage: 20.0,
+          handlingPercentage: 5.0,
+          riskBufferPercentage: 3.0,
+          profitPercentage: 15.0,
+          fixedFeeETB: 0,
+          roundingRule: 'None',
           updatedAt: new Date().toISOString()
         }
       ],
-      purchase_tasks: []
+      purchase_tasks: [],
+      suppliers: [
+        { id: 1, name: 'Shein', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Temu', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Amazon', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'AliExpress', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Noon', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 6, name: 'Custom Supplier', isArchived: false, createdAt: new Date().toISOString() }
+      ],
+      brands: [
+        { id: 1, name: 'Nike', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Adidas', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Puma', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Gucci', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Rolex', isArchived: false, createdAt: new Date().toISOString() }
+      ],
+      departments: [
+        { id: 1, name: 'Women', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Men', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Kids', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Unisex', isArchived: false, createdAt: new Date().toISOString() }
+      ],
+      categories: [
+        { id: 1, name: 'Dresses', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Shoes', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Bags', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Perfumes', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Watches', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 6, name: 'Accessories', isArchived: false, createdAt: new Date().toISOString() }
+      ],
+      subcategories: [
+        { id: 1, name: 'Sneakers', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Running Shoes', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Sandals', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Boots', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Slippers', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 6, name: 'Heels', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 7, name: 'Formal Shoes', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 8, name: 'Casual', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 9, name: 'Maxi', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 10, name: 'Mini', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 11, name: 'Party', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 12, name: 'Evening', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 13, name: 'Abaya', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 14, name: 'Wedding', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 15, name: 'Handbags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 16, name: 'Backpacks', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 17, name: 'Shoulder Bags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 18, name: 'Crossbody Bags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 19, name: 'Wallets', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 20, name: 'Travel Bags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 21, name: 'Smart Watches', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 22, name: 'Sports', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 23, name: 'Luxury', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 24, name: 'Analog', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 25, name: 'Digital', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 26, name: 'Sunglasses', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 27, name: 'Jewelry', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 28, name: 'Hats', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 29, name: 'Belts', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 30, name: 'Scarves', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() }
+      ]
     };
     fs.mkdirSync(path.dirname(FALLBACK_DB_PATH), { recursive: true });
     fs.writeFileSync(FALLBACK_DB_PATH, JSON.stringify(initialStore, null, 2));
@@ -427,13 +529,94 @@ export function loadStore(): any {
   try {
     const raw = fs.readFileSync(FALLBACK_DB_PATH, 'utf8');
     const parsed = JSON.parse(raw);
+    let changed = false;
     if (!parsed.purchase_tasks) {
       parsed.purchase_tasks = [];
+      changed = true;
+    }
+    if (!parsed.suppliers) {
+      parsed.suppliers = [
+        { id: 1, name: 'Shein', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Temu', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Amazon', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'AliExpress', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Noon', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 6, name: 'Custom Supplier', isArchived: false, createdAt: new Date().toISOString() }
+      ];
+      changed = true;
+    }
+    if (!parsed.brands) {
+      parsed.brands = [
+        { id: 1, name: 'Nike', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Adidas', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Puma', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Gucci', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Rolex', isArchived: false, createdAt: new Date().toISOString() }
+      ];
+      changed = true;
+    }
+    if (!parsed.departments) {
+      parsed.departments = [
+        { id: 1, name: 'Women', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Men', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Kids', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Unisex', isArchived: false, createdAt: new Date().toISOString() }
+      ];
+      changed = true;
+    }
+    if (!parsed.categories) {
+      parsed.categories = [
+        { id: 1, name: 'Dresses', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Shoes', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Bags', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Perfumes', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Watches', isArchived: false, createdAt: new Date().toISOString() },
+        { id: 6, name: 'Accessories', isArchived: false, createdAt: new Date().toISOString() }
+      ];
+      changed = true;
+    }
+    if (!parsed.subcategories) {
+      parsed.subcategories = [
+        { id: 1, name: 'Sneakers', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 2, name: 'Running Shoes', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 3, name: 'Sandals', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 4, name: 'Boots', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 5, name: 'Slippers', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 6, name: 'Heels', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 7, name: 'Formal Shoes', categoryId: 2, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 8, name: 'Casual', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 9, name: 'Maxi', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 10, name: 'Mini', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 11, name: 'Party', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 12, name: 'Evening', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 13, name: 'Abaya', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 14, name: 'Wedding', categoryId: 1, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 15, name: 'Handbags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 16, name: 'Backpacks', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 17, name: 'Shoulder Bags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 18, name: 'Crossbody Bags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 19, name: 'Wallets', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 20, name: 'Travel Bags', categoryId: 3, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 21, name: 'Smart Watches', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 22, name: 'Sports', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 23, name: 'Luxury', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 24, name: 'Analog', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 25, name: 'Digital', categoryId: 5, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 26, name: 'Sunglasses', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 27, name: 'Jewelry', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 28, name: 'Hats', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 29, name: 'Belts', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() },
+        { id: 30, name: 'Scarves', categoryId: 6, isArchived: false, createdAt: new Date().toISOString() }
+      ];
+      changed = true;
+    }
+    if (changed) {
+      fs.writeFileSync(FALLBACK_DB_PATH, JSON.stringify(parsed, null, 2));
     }
     return parsed;
   } catch (err) {
     console.error('Failed to read fallback DB file:', err);
-    return { users: [], products: [], orders: [], banners: [], settings: [], purchase_tasks: [] };
+    return { users: [], products: [], orders: [], banners: [], settings: [], purchase_tasks: [], suppliers: [], brands: [], departments: [], categories: [], subcategories: [] };
   }
 }
 
@@ -669,6 +852,10 @@ function executeRawSql(sqlObj: any): any {
 }
 
 export class DrizzleEmulator {
+  async transaction(callback: (tx: any) => Promise<any>) {
+    return await callback(this);
+  }
+
   select(fields?: any) {
     return {
       from: (table: any) => {
